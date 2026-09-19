@@ -50,7 +50,7 @@ Transport layer: client and server speak JSON-RPC 2.0, not plain REST. Two trans
 <a href="https://github.com/mayank953/Live-Class-2026/blob/main/classes_summary/16%20-%2023%20Aug%20-%20MCP%20Introduction.md" target="_blank">MCP-Host-Client-Server</a>
 
 
-![Host-Client-Server diagram.](mcp-host-client-server.png "MCP Host-Client-Server")
+![Host-Client-Server diagram.](images/mcp-host-client-server.png "MCP Host-Client-Server")
 
 MCP Server contains tools, resources, prompts.
 
@@ -144,17 +144,17 @@ MCP uses JSON-RPC because MCP needs a standardized, transport-independent RPC me
 
 * Step 1 -
 A sample request structure from client to server using json rpc 2.0
-![Host-Client-Server diagram.](mcp-client-1.png "MCP client")
+![Host-Client-Server diagram.](images/mcp-client-1.png "MCP client")
 
 * Step 2 -
 Response from server to client
-![Host-Client-Server diagram.](mcp-server-1.png "MCP server")
+![Host-Client-Server diagram.](images/mcp-server-1.png "MCP server")
 The id value in response from server matches with the request from client. 
 The id helps to link the response to a specific request. protocolversion has to be compatible between client and server. 
 
 * Step 3 -
 Client responds back with initialized notification. 
-![Host-Client-Server diagram.](mcp-client-2.png "MCP client")
+![Host-Client-Server diagram.](images/mcp-client-2.png "MCP client")
 
 As client sends new request for additional calls, id value is incremeneted.
 After this, they are connected for the whole session. 
@@ -202,7 +202,7 @@ Only use capabilities that were successfully negotiated
 Discovery fires automatically the instant the handshake completes — before the user even asks a question.
 
 In discovery tools primitive will call tools/list. The server responds back with description about the tool. After this only the actual tool call from the client side. 
-![Host-Client-Server diagram.](mcp-client-3.png "MCP client")
+![Host-Client-Server diagram.](images/mcp-client-3.png "MCP client")
 
 **Calling**
 In this phase actual tool call happens with tools/call and passing the arguments. 
@@ -229,7 +229,7 @@ In STDIO, No JSON-RPC message is exchanged during shutdown at all. The entire re
 **if mcp server is running remote** \
 Streamable http - client talks to server over http protocol using post request. client can close connection. The url is ending in /mcp. 
 see this setup has local and remote connections. \
-![MCP-Server-Type diagram.](mcp-server-type.png "MCP server type")
+![MCP-Server-Type diagram.](images/mcp-server-types.png "MCP server type")
 
 **How to create MCP Server and run it locally**
 
@@ -308,9 +308,9 @@ uv --directory <folder where python file is present> run python mcp_with_primiti
 
 ```
 
-![MCP-JAM-Connect local tools diagram.](mcp-mcpjam-localtools.png "MCP JAM local server tools")
+![MCP-JAM-Connect local tools diagram.](images/mcp-mcpjam-localtools.png "MCP JAM local server tools")
 
-![MCP-JAM-Connect to local diagram.](mcp-mcpjam-localserver.png "MCP JAM connect STDIO to local server")
+![MCP-JAM-Connect to local diagram.](images/mcp-mcpjam-localserver.png "MCP JAM connect STDIO to local server")
 
 **connect as Streamable HTTP to your local mcp server**
 
@@ -322,7 +322,7 @@ uv run fastmcp run mcp_with_primitives.py --transport http --port 8000
 ```
 Using the above URL you can connect from MCPJAM now. 
 
-![MCP Streamable HTTP connected.](mcp-http-connected.png "MCP Streamable HTTP connected")
+![MCP Streamable HTTP connected.](images/mcp-http-connected.png "MCP Streamable HTTP connected")
 
 **mcp libraries**
 **mcp library**
@@ -352,3 +352,278 @@ You can see this connector when you open claude desktop. If you want to remove i
 go to terminal and run nano ~/Library/Application\ Support/Claude/claude_desktop_config.json
 Edit the file and remove the specific server added under mcpservers file. 
 CNTRL + 0 and CNTRL+X to save and exit. 
+
+
+
+#### Integrate MCPServers with Claude
+
+**Connectors**\
+We can connect to third party MCP servers from our code using MCPClient using connectors. FastMCP has MCPClient and Langchain has MCPAdapter that is also a way to connect to MCPServer as a MCPClient. 
+
+
+
+**local servers**\
+we can use config file to add local mcpservers. 
+if you installed local mcp server to claude using above command it wont show up in claude connectors. For that you have to go to developer -> manage your local mcp servers > Edit Config. This will open claude_desktop_config.json and you can add your local mcp server there. If you want recipebox to show up in connectors then you need to edit config to include path to uv (using which uv). Once below is saved into claude config, and now if we restart claude we can see the connector connecting to our local server. The files we link in developer tool, can be node or python or docker based. 
+
+```
+{
+  "mcpServers": {
+    "weather": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/ABSOLUTE/PATH/TO/PARENT/FOLDER/weather",
+        "run",
+        "weather.py"
+      ]
+    }
+  }
+}
+```
+
+**Starting mcpserver in vscode**\
+command + shift + p -> add mcp server. Give the command as uv run fastapi run recipe_box.py.   In the generated mcp.json, change uv to full path where uv is present, Change the cwd to have current directory path of python. This should help to run the VS Code. Optionally, if needed restart VSCode using Cmd + Shift + P → Developer: Reload Window
+
+
+**Not all third party servers are HTTP streamable**
+You can have third party servers in STDIO as well. Example gmail server can be added into claude desktop using below
+https://github.com/GongRzhe/Gmail-MCP-Server
+
+```
+{
+  "mcpServers": {
+    "gmail": {
+      "command": "npx",
+      "args": [
+        "@gongrzhe/server-gmail-autoauth-mcp"
+      ]
+    }
+  }
+}
+```
+
+For Tavily search it has both options. For setting up local MCP server in claude desktop, we need to run tavily search install using node js like 
+```npx -y tavily-mcp@latest```.
+ This downloads and starts the Tavily MCP server locally using Node.js/npm. Tavily officially documents this as the local way to run its MCP server.\
+ https://github.com/tavily-ai/tavily-mcp \
+Then we can add it to claude desktop client like below
+```
+{
+  "mcpServers": {
+    "tavily-mcp": {
+      "command": "npx",
+      "args": ["-y", "tavily-mcp@latest"],
+      "env": {
+        "TAVILY_API_KEY": "your-api-key-here",
+        "DEFAULT_PARAMETERS": "{\"include_images\": true, \"max_results\": 15, \"search_depth\": \"advanced\"}"
+      }
+    }
+  }
+}
+```
+```mermaid
+flowchart TD
+    A["MCP Client<br/>Claude / VS Code / Cursor"]
+    B["npx -y tavily-mcp@latest"]
+    C["npx resolves/downloads<br/>tavily-mcp@latest"]
+    D["Tavily MCP Server<br/>Local Process"]
+    E["MCP over stdio<br/>JSON-RPC messages"]
+    F["Tavily API"]
+    G["Web Search / Extract / Crawl / Map"]
+
+    A -->|"Launches"| B
+    B --> C
+    C --> D
+    A <-->|"MCP"| E
+    E --- D
+    D -->|"API requests"| F
+    F --> G
+```
+
+### Time Tracker Project
+You create FASTAPI and FastMCP server.
+```text
+                    TimeTrack
+                       |
+                  FastAPI App
+                       |
+             +---------+---------+
+             |                   |
+          /api/...              /mcp
+             |                   |
+        REST API             FastMCP
+             |                   |
+             +---------+---------+
+                       |
+                  database.py
+                       |
+                    SQLite
+```
+```mcp_app = mcp.http_app(path="/").```  This creates a streamable mcp server. 
+
+
+```app.mount("/mcp", mcp_app)``` puts that MCP HTTP application under: ```http://127.0.0.1:9998/mcp```
+
+Note that  ```mcp.http_app(path="/")``` its not ```path="/mcp"```. The ```app.mount("/mcp", mcp_app)``` call below it already adds that prefix. Setting both doubles it into /mcp/mcp.
+
+
+
+```app = FastAPI(title="TimeTrack", lifespan=mcp_app.lifespan)``` 
+makes FastAPI manage the MCP application's lifecycle.
+
+**connect from claude as STDIO**
+Now if you want to connect from claude desktop to this MCP and if you use
+```
+{
+  "command": "uv",
+  "args": [
+    "--directory",
+    ".../timetrack/",
+    "run",
+    "main.py"
+  ]
+}
+``` 
+That tells Claude:"Launch main.py as a local stdio MCP server." That's the problem.
+Your main.py doesn't start an MCP stdio server in the timetracker project. It merely defines a fastapi app and mcp app but does not have ```if __name__ == "__main__":```
+
+The correct way is 
+```
+uv run uvicorn main:app --port 9998 --reload
+```
+Now you have below. And mcp is available as Streamable HTTP in http://127.0.0.1:9998/mcp
+```text
+Terminal
+   |
+   | uv run uvicorn main:app --port 9998
+   v
+Uvicorn
+   |
+   v
+FastAPI application
+   |
+   +------------------+------------------+------------------+
+   |                  |                  |                  |
+   v                  v                  v                  v
+  /                  /api              /static             /mcp
+   |                  |                  |                  |
+   v                  v                  v                  v
+Website          REST API          Static Files        FastMCP
+                                                            |
+                                                            v
+                                                        SQLite
+```
+
+
+The mcp.run() defaults to stdio, so you would explicitly be choosing the stdio transport there so it can be connected from claude using claude config. Your current mcp.http_app() is choosing the HTTP/Streamable HTTP approach. 
+
+| Approach                    | Claude starts process? | Connection                 |
+| --------------------------- | ---------------------- | -------------------------- |
+| **stdio**                   | Yes                    | stdin/stdout               |
+| **Streamable HTTP, local**  | No                     | `http://localhost:.../mcp` |
+| **Remote custom connector** | No                     | Public HTTPS URL           |
+
+
+
+**switching between mcp and regular app (if fastapi is there)**\
+```uv run fastmcp run main.py```
+###### Starting MCP server 'TimeTrack' with transport 'stdio'
+```uv run uvicorn main:app --reload```
+######  now reachable at http://127.0.0.1:8000, with the MCP endpoint at /mcp
+The distinction matters: uv run fastmcp run main.py starts just the MCP server object. uv run uvicorn main:app starts the whole application — the website, the REST API, and the MCP server mounted together — because app is the FastAPI instance that has everything wired into it.
+
+
+**start application and curl to mcp as streamable http**
+
+Start mcp server and application as streamable http
+```
+uv run uvicorn main:app --port 9998 --reload
+```
+
+Now to check if mcp is started or not do a curl to mcp url to initialize the connection.
+```
+curl -i -X POST http://127.0.0.1:9998/mcp/ \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {},
+      "clientInfo": {
+        "name": "curl-test",
+        "version": "1.0"
+      }
+    }
+  }
+``` 
+We got the response as below. we also got mcp-session-id. 
+```
+HTTP/1.1 200 OK
+date: Sat, 19 Sep 2026 15:36:05 GMT
+server: uvicorn
+cache-control: no-cache, no-transform
+connection: keep-alive
+content-type: text/event-stream
+mcp-session-id: d1247120a6a841b482984ae261e55dce
+x-accel-buffering: no
+Transfer-Encoding: chunked
+
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{"logging":{},"prompts":{"listChanged":true},"resources":{"subscribe":false,"listChanged":true},"tools":{"listChanged":true}},"serverInfo":{"name":"TimeTrack","version":"4.0.5"}}}
+```
+
+Next we send initialized curl command to mcp to indicate we are accepting this connection.
+```
+curl -i -X POST http://127.0.0.1:9998/mcp/ \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: d1247120a6a841b482984ae261e55dce" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "notifications/initialized"
+  }'
+```
+
+We recieved response as 
+```
+HTTP/1.1 202 Accepted
+date: Sat, 19 Sep 2026 15:41:22 GMT
+server: uvicorn
+content-type: application/json
+mcp-session-id: d1247120a6a841b482984ae261e55dce
+content-length: 0
+
+```
+Next we can send reques to list/tools. 
+```
+curl -i -X POST http://127.0.0.1:9998/mcp/ \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: d1247120a6a841b482984ae261e55dce" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/list",
+    "params": {}
+  }'
+```
+
+Response we got. 
+```
+HTTP/1.1 200 OK
+date: Sat, 19 Sep 2026 15:42:14 GMT
+server: uvicorn
+cache-control: no-cache, no-transform
+connection: keep-alive
+content-type: text/event-stream
+mcp-session-id: d1247120a6a841b482984ae261e55dce
+x-accel-buffering: no
+Transfer-Encoding: chunked
+
+event: message
+data: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"_meta":{"fastmcp":{"tags":[]}},"description":"Log a time entry. entry_date must be YYYY-MM-DD. Shows up on the website immediately.","inputSchema":{"properties":{"employee_name":{"type":"string"},"project":{"type":"string"},"entry_date":{"type":"string"},"hours":{"type":"number"},"description":{"default":"","type":"string"}},"required":["employee_name","project","entry_date","hours"],"type":"object","additionalProperties":false},"name":"log_time","outputSchema":{"type":"object","additionalProperties":true},"title":"Log Time"},{"_meta":{"fastmcp":{"tags":[]}},"description":"Get one employee's logged entries, optionally filtered to a date range (YYYY-MM-DD).","inputSchema":{"properties":{"employee_name":{"type":"string"},"start_date":{"default":"","type":"string"},"end_date":{"default":"","type":"string"}},"required":["employee_name"],"type":"object","additionalProperties":false},"name":"get_timesheet","outputSchema":{"properties":{"result":{"items":{"additionalProperties":true,"type":"object"},"type":"array"}},"required":["result"],"type":"object","x-fastmcp-wrap-result":true},"title":"Get Timesheet"},{"_meta":{"fastmcp":{"tags":[]}},"description":"Get total hours logged against a project, broken down by employee.","inputSchema":{"properties":{"project":{"type":"string"}},"required":["project"],"type":"object","additionalProperties":false},"name":"get_project_summary","outputSchema":{"type":"object","additionalProperties":true},"title":"Get Project Summary"},{"_meta":{"fastmcp":{"tags":[]}},"description":"List every project that has at least one logged time entry.","inputSchema":{"properties":{},"type":"object","additionalProperties":false},"name":"list_projects","outputSchema":{"properties":{"result":{"items":{"type":"string"},"type":"array"}},"required":["result"],"type":"object","x-fastmcp-wrap-result":true},"title":"List Projects"}]}}
+```
