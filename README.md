@@ -15,7 +15,8 @@ Folder: `krishnaik-agentic-ai-3-0/`
 |------|-------------|
 | `krishnaik-3-0-langchain-notes.md` | Course notes: models/messages, prompt templates, structured output, tools, `ToolRuntime`, middleware, HITL |
 | `krishnaik-3-0-mcp-notes.md` | Course notes on MCP (host/client/server architecture, server types, MCP JAM, streamable HTTP) |
-| `krishnaik-3-0-1-assignment-langchain.md` | Assignment Q&A covering agents/harness, messages, structured output, and tools |
+| `krishnaik-3-0-1-assignment-langchain.md` | Assignment 1, Part A: written Q&A covering agents/harness, messages, structured output, and tools |
+| `krishnaik-3-0-1-assignment-langchain-part-b.ipynb` | Assignment 1, Part B: my coding-exercise solutions (a `@tool`, a `ChatPromptTemplate`, a constrained-field Pydantic `FoodOrder` schema, and the Medium exercises) |
 | `krishnaik-3-0-langchain-tools.ipynb` | Defining and using LangChain tools with `init_chat_model` |
 | `krishnaik-3-0-langchain-structured-schema.ipynb` | Structured output with `ToolStrategy`, `ProviderStrategy`, and agent `response_format` |
 | `krishnaik-3-0-langchain-agentstate-runtime.ipynb` | Agent state, context/tool runtime, dynamic prompting, human-in-the-loop with `interrupt`/`Command` |
@@ -40,10 +41,16 @@ Folder: `krishnaik-agentic-ai-3-0/`
 - Connecting local tools/servers via MCP JAM
 - Using the time-tracking MCP server from Claude
 
-**`krishnaik-3-0-1-assignment-langchain.md`**
+**`krishnaik-3-0-1-assignment-langchain.md`** (Part A)
 - Agent vs. harness, the Lang product family (LangChain/LangGraph/LangSmith/Deep Agents)
 - Message types, prompt templates, structured output internals
 - `ToolRuntime`, `Command`, tool gating, headless tools
+
+**`krishnaik-3-0-1-assignment-langchain-part-b.ipynb`** (Part B)
+- Defining a tool with the `@tool` decorator
+- A reusable `ChatPromptTemplate`
+- A Pydantic schema with constrained fields (`FoodOrder`)
+- Medium-level exercises building on the above
 
 **`krishnaik-3-0-langchain-tools.ipynb`**
 - LangChain 3.0 `init_chat_model` setup
