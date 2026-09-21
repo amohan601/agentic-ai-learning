@@ -1,0 +1,2 @@
+This server was built across Parts 2 and 4A of the MCP crash course.
+It demonstrates all three primitives: tools, resources, and prompts.

@@ -231,6 +231,11 @@ Streamable http - client talks to server over http protocol using post request. 
 see this setup has local and remote connections. \
 ![MCP-Server-Type diagram.](images/mcp-server-types.png "MCP server type")
 
+
+**stdio vs http streamable difference**\
+![MCP STDIO vs Steamable.](images/mcp-stdio-http.png "MCP STDIO vs Steamable")
+
+
 **How to create MCP Server and run it locally**
 
 MCP servers can be created and run in local. 
@@ -460,8 +465,9 @@ You create FASTAPI and FastMCP server.
                        |
                     SQLite
 ```
-```mcp_app = mcp.http_app(path="/").```  This creates a streamable mcp server. 
+```mcp_app = mcp.http_app(path="/").```  This creates a streamable mcp server. Or use ```mcp.run()``` with transport as streamable
 
+if you want to start your project as STDIO you should have main invocation with ```mcp.run()``` with default transport as STDIO
 
 ```app.mount("/mcp", mcp_app)``` puts that MCP HTTP application under: ```http://127.0.0.1:9998/mcp```
 
@@ -472,7 +478,7 @@ Note that  ```mcp.http_app(path="/")``` its not ```path="/mcp"```. The ```app.mo
 ```app = FastAPI(title="TimeTrack", lifespan=mcp_app.lifespan)``` 
 makes FastAPI manage the MCP application's lifecycle.
 
-**connect from claude as STDIO**
+**connect from claude as STDIO**\
 Now if you want to connect from claude desktop to this MCP and if you use
 ```
 {
@@ -486,8 +492,14 @@ Now if you want to connect from claude desktop to this MCP and if you use
 }
 ``` 
 That tells Claude:"Launch main.py as a local stdio MCP server." That's the problem.
+
 Your main.py doesn't start an MCP stdio server in the timetracker project. It merely defines a fastapi app and mcp app but does not have ```if __name__ == "__main__":```
 
+**timetracker integrated into claude desktop as STDIO**
+![timetracker claude desktop.](images/timetracker-claude-results.png "timetracker")
+
+
+**To start MCP server as Remote HTTP streamable**\
 The correct way is 
 ```
 uv run uvicorn main:app --port 9998 --reload
@@ -526,13 +538,21 @@ The mcp.run() defaults to stdio, so you would explicitly be choosing the stdio t
 
 
 
-**switching between mcp and regular app (if fastapi is there)**\
-```uv run fastmcp run main.py```
-###### Starting MCP server 'TimeTrack' with transport 'stdio'
-```uv run uvicorn main:app --reload```
-######  now reachable at http://127.0.0.1:8000, with the MCP endpoint at /mcp
-The distinction matters: uv run fastmcp run main.py starts just the MCP server object. uv run uvicorn main:app starts the whole application — the website, the REST API, and the MCP server mounted together — because app is the FastAPI instance that has everything wired into it.
 
+**switching between mcp and regular app (if fastapi is there)**
+
+| Command / Setup | What it starts | Transport | Endpoint / Access |
+|---|---|---|---|
+| `uv run fastmcp run main.py` | FastMCP server (`TimeTrack`) only | **stdio** | MCP communicates through stdin/stdout 
+| `uv run fastmcp --transport http run main.py` | FastMCP server (`TimeTrack`) only | **http** | MCP communicates through http
+| `uv run uvicorn main:app --reload` | FastAPI application + mounted FastMCP server | FastMCP uses **Streamable HTTP** | FastAPI: `http://127.0.0.1:8000`<br>MCP: `http://127.0.0.1:8000/mcp/` |
+| `python main.py` + `mcp.run()` | FastMCP server (`TimeTrack`) only | **stdio** | MCP communicates through stdin/stdout |
+| `python main.py` + `mcp.run(transport=http)` | FastMCP server (`TimeTrack`) only | **http** | MCP communicates through http |
+| `python main.py` + `uvicorn.run(app, ...)` | FastAPI application + mounted FastMCP server | FastMCP uses **Streamable HTTP** | FastAPI: `http://127.0.0.1:8000`<br>MCP: `http://127.0.0.1:8000/mcp/` |
+
+The distinction matters: ```uv run fastmcp run main.py``` starts just the MCP server object. ```uv run uvicorn main:app``` starts the whole application — the website, the REST API, and the MCP server mounted together — because app is the FastAPI instance that has everything wired into it.
+
+With MCP stdio, the MCP client usually starts the MCP server as a child process and communicates with it through stdin/stdout.
 
 **start application and curl to mcp as streamable http**
 
@@ -627,3 +647,18 @@ Transfer-Encoding: chunked
 event: message
 data: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"_meta":{"fastmcp":{"tags":[]}},"description":"Log a time entry. entry_date must be YYYY-MM-DD. Shows up on the website immediately.","inputSchema":{"properties":{"employee_name":{"type":"string"},"project":{"type":"string"},"entry_date":{"type":"string"},"hours":{"type":"number"},"description":{"default":"","type":"string"}},"required":["employee_name","project","entry_date","hours"],"type":"object","additionalProperties":false},"name":"log_time","outputSchema":{"type":"object","additionalProperties":true},"title":"Log Time"},{"_meta":{"fastmcp":{"tags":[]}},"description":"Get one employee's logged entries, optionally filtered to a date range (YYYY-MM-DD).","inputSchema":{"properties":{"employee_name":{"type":"string"},"start_date":{"default":"","type":"string"},"end_date":{"default":"","type":"string"}},"required":["employee_name"],"type":"object","additionalProperties":false},"name":"get_timesheet","outputSchema":{"properties":{"result":{"items":{"additionalProperties":true,"type":"object"},"type":"array"}},"required":["result"],"type":"object","x-fastmcp-wrap-result":true},"title":"Get Timesheet"},{"_meta":{"fastmcp":{"tags":[]}},"description":"Get total hours logged against a project, broken down by employee.","inputSchema":{"properties":{"project":{"type":"string"}},"required":["project"],"type":"object","additionalProperties":false},"name":"get_project_summary","outputSchema":{"type":"object","additionalProperties":true},"title":"Get Project Summary"},{"_meta":{"fastmcp":{"tags":[]}},"description":"List every project that has at least one logged time entry.","inputSchema":{"properties":{},"type":"object","additionalProperties":false},"name":"list_projects","outputSchema":{"properties":{"result":{"items":{"type":"string"},"type":"array"}},"required":["result"],"type":"object","x-fastmcp-wrap-result":true},"title":"List Projects"}]}}
 ```
+
+**Hosting MCP HTTP server in a cloud server**
+
+* prefect/horizon
+* vercel
+* docker container
+* pypi
+  
+### Additional references
+
+https://mcp-lifecycle.netlify.app/
+
+https://mcp-legacy-vs-modern.netlify.app/
+
+https://github.com/mayank953/Live-Class-2026/tree/main/Complete%20MCP

@@ -795,7 +795,7 @@ we can pass ToolRuntime to tool arguments and langchain can provide lot of addit
 | **Tool Call ID** | `ToolCallId` | Unique identifier for the current tool invocation | Correlate tool calls for logs and model invocations |
 
 
-![Tool Runtime diagram.](tool-runtime-state.png "Tool Runtime diagram")
+![Tool Runtime diagram.](images/tool-runtime-state.png "Tool Runtime diagram")
 
 #### Long term memory. 
 
@@ -933,7 +933,7 @@ def recall_travel_style(user_id: str, runtime: ToolRuntime) -> str:
 * we have option to do before_agent, before_model, after_agent, after_model setup, wrap_tool_call(before tool call), wrap_model_call
 * middle ware is one way to apply guard rails
 
-![Middleware diagram.](middleware1.png "Middleware")
+![Middleware diagram.](images/middleware1.png "Middleware")
 
 Code for this section 
 <a href="langchain-middleware.ipynb" target="_blank">langchain-middleware.ipynb</a>
@@ -1591,7 +1591,7 @@ tool_calls=[
 ## Custom Middleware
 You can build custom middleware by adding hooks at specific points in the agent execution flow. Hooks are Node style hooks and wrap style hooks. Hooks are extension points in custom middleware that let you intercept, inspect, or modify agent execution at specific stages of the lifecycle. 
 
-![Middleware diagram.](custom-middleware.png "Custom Middleware")
+![Middleware diagram.](images/custom-middleware.png "Custom Middleware")
 
 #### Decorator middleware 
 
@@ -1804,7 +1804,7 @@ result = agent_with_context.invoke(
 #### ToolRuntime
 The runtime from agent is passed on to Tools as ToolsRuntime
 
-![Tool Runtime diagram.](toolruntime.png "Tool Runtime")
+![Tool Runtime diagram.](images/toolruntime.png "Tool Runtime")
 It will have Runtime fields + some additional info below
 * **state** - short term memory with mutable data that is available for current invocation
 * **Tool Call ID** - Unique identifier for the current tool invocation
@@ -1880,7 +1880,7 @@ def my_hook(request, handler):
 ```
 So yes: both styles can work with state and runtime. The key difference is that node-style hooks receive them directly, while wrap-style hooks receive a request object that carries the execution information.
 
-![Runtime diagram.](runtime.png "Runtime")
+![Runtime diagram.](images/runtime.png "Runtime")
 
 * State and Runtime are two items
 * State schema -> AgentState implementation
@@ -1894,7 +1894,7 @@ So yes: both styles can work with state and runtime. The key difference is that 
 * In wrap style hooks, request.state and request.runtime has the same information 
 
 
-![State vs Context diagram.](state_context_diff.png "State-Context-Difference")
+![State vs Context diagram.](images/state_context_diff.png "State-Context-Difference")
 
 
 ### Dynamic prompting
@@ -1977,7 +1977,7 @@ when using respond action decision, the message in the response is passed as Too
 | `respond` | "Don't execute the tool. Here's information/instructions from me instead." | ❌ No |
 | `edit` | "Change the tool call's arguments, then execute it." | ✅ Yes |
 
-![HITL Decision diagram.](hitl-decision.png "HITL Decision")
+![HITL Decision diagram.](images/hitl-decision.png "HITL Decision")
 
 #### Conditional interrupts in HITL
 

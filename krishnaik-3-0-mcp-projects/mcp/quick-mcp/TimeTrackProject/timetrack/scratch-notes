@@ -1,0 +1,27 @@
+# For app and mcp to start together. 
+uv run uvicorn main_to_understand:app --port 9998 --reload
+
+CLIENT_PORT=9999 npx @modelcontextprotocol/inspector python3 main_to_understand.py
+
+uv run uvicorn main:app --port 9998 --reload
+
+
+      "timetracker": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "directory_path_to_python_file",
+        "run",
+        "main_to_understand.py"
+      ]
+    }
+
+          "timetracker": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "directory_path_to_python_file",
+        "run",
+        "main.py"
+      ]
+    }

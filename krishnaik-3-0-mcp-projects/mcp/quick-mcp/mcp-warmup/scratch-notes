@@ -1,0 +1,20 @@
+uv init mcp-warmup
+uv add fastmcp
+uv run python server.py
+npx -y @modelcontextprotocol/inspector uv run python server.py
+
+uv run python mcp_with_primitives.py
+
+
+npx -y @modelcontextprotocol/inspector uv run python mcp_with_primitives.py
+
+Start mcpjam
+npx @mcpjam/inspector@latest --port 4000
+
+npx @mcpjam/inspector@latest uv run fastmcp run directory_path_to_python_file/mcp_with_primitives.py
+
+if running as STDIO
+uv --directory directory_path_to_python_file run python mcp_with_primitives.py
+
+ uv run fastmcp run directory_path_to_python_file/mcp_with_primitives.py
+uv run fastmcp run mcp_with_primitives.py --transport http --port 8000
