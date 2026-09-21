@@ -23,4 +23,5 @@ wheels/
 
 # Local data and scratch notes
 *.db
+chromadb*/
 scratch-notes-old*

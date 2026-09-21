@@ -1,13 +1,17 @@
 # LangChain Examples
 
-Practice notebooks and exercises from two different courses:
+Practice notebooks and exercises from two different courses, each in its own folder:
 
-- **365 Careers (Udemy)** — [The AI Agent Engineer Course — Complete AI Agent Bootcamp](https://blue.udemy.com/course/the-ai-agent-engineer-course-complete-ai-gent-bootcamp)
-- **Krish Naik Academy** — LangChain 3.0 examples from the [Krish Naik Academy](https://www.krishnaik.in/) Agentic AI curriculum
+| Folder | Course |
+|--------|--------|
+| [`udemy-365-ai-agent-engineer-bootcamp/`](udemy-365-ai-agent-engineer-bootcamp) | **365 Careers (Udemy)** — [The AI Agent Engineer Course — Complete AI Agent Bootcamp](https://blue.udemy.com/course/the-ai-agent-engineer-course-complete-ai-gent-bootcamp) |
+| [`krishnaik-agentic-ai-3-0/`](krishnaik-agentic-ai-3-0) | **Krish Naik Academy** — LangChain 3.0 / Agentic AI 3.0 from the [Krish Naik Academy](https://www.krishnaik.in/) curriculum |
 
 ## Krish Naik Academy (Agentic AI 3.0)
 
-| File | Description |
+Folder: `krishnaik-agentic-ai-3-0/`
+
+| File / Folder | Description |
 |------|-------------|
 | `krishnaik-3-0-langchain-notes.md` | Course notes: models/messages, prompt templates, structured output, tools, `ToolRuntime`, middleware, HITL |
 | `krishnaik-3-0-mcp-notes.md` | Course notes on MCP (host/client/server architecture, server types, MCP JAM, streamable HTTP) |
@@ -16,7 +20,8 @@ Practice notebooks and exercises from two different courses:
 | `krishnaik-3-0-langchain-structured-schema.ipynb` | Structured output with `ToolStrategy`, `ProviderStrategy`, and agent `response_format` |
 | `krishnaik-3-0-langchain-agentstate-runtime.ipynb` | Agent state, context/tool runtime, dynamic prompting, human-in-the-loop with `interrupt`/`Command` |
 | `krishnaik-3-0-langchain-middleware.ipynb` | Prebuilt middleware (summarization, HITL, model/tool-call limits, PII, retry, tool selector, shell) and custom middleware |
-| `images/` | Diagrams referenced from the two notes files above |
+| `krishnaik-3-0-mcp-projects/` | Runnable MCP examples: `mcp-warmup`, `my-first-mcp` (recipe box), and `TimeTrackProject` (time-tracking MCP server + web app) |
+| `images/` | Diagrams and screenshots referenced from the notes files |
 
 ### Topics covered
 
@@ -31,9 +36,9 @@ Practice notebooks and exercises from two different courses:
 
 **`krishnaik-3-0-mcp-notes.md`**
 - MCP host/client/server architecture
-- MCP server types
+- MCP server types and transports (stdio, streamable HTTP)
 - Connecting local tools/servers via MCP JAM
-- Streamable HTTP transport
+- Using the time-tracking MCP server from Claude
 
 **`krishnaik-3-0-1-assignment-langchain.md`**
 - Agent vs. harness, the Lang product family (LangChain/LangGraph/LangSmith/Deep Agents)
@@ -60,14 +65,22 @@ Practice notebooks and exercises from two different courses:
 - Prebuilt middleware: summarization, HITL, model-call limit, model fallback, tool-call limit, PII (incl. regex checks), todo list, `LLMToolSelectorMiddleware`, `ToolErrorMiddleware`, `ToolRetryMiddleware`, `LLMToolEmulator`, `ShellToolMiddleware`
 - Custom middleware, including dynamic model switching and class-based middleware
 
+### Running the MCP projects
+
+Each project under `krishnaik-3-0-mcp-projects/mcp/quick-mcp/` is a [uv](https://docs.astral.sh/uv/) project. `.venv/` is not committed; `uv run` (or `uv sync`) recreates it from `pyproject.toml` and `uv.lock`.
+
 ## 365 Careers (Udemy Bootcamp)
+
+Folder: `udemy-365-ai-agent-engineer-bootcamp/`
 
 | File | Description |
 |------|-------------|
 | `langchain_examples.ipynb` | Main notebook covering OpenAI API usage, LangChain fundamentals, and RAG |
+| `langgraph_examples.ipynb` | LangGraph notebook: state graphs, conditional edges, reducers, summarization, checkpoints, and SQLite long-term memory (also published in [`amohan601/langgraph-examples`](https://github.com/amohan601/langgraph-examples)) |
 | `gardening_doc.pdf` | Sample PDF used for the document loading / splitting / RAG examples |
 | `gardening_docx.docx`, `gardening_doc2_md.docx` | Sample DOCX versions of the gardening doc, used for DOCX loading examples |
 | `plant_care.docx` | Additional sample DOCX used for document loading and retrieval examples |
+| `requirements.txt` | Python dependencies and environment setup notes |
 
 ### Topics covered
 
@@ -88,30 +101,37 @@ Practice notebooks and exercises from two different courses:
 *Retrieval-Augmented Generation (RAG)*
 - Document loading (PDF, DOCX) using the sample gardening/plant-care docs
 - Text splitting (character and markdown splitters)
-- Document embedding and vector stores (ChromaDB)
+- Document embedding and vector stores (ChromaDB, written to `chromadb*/` next to the notebook and git-ignored)
 - Document retrieval (similarity search, MMR)
 - LLM response generation from retrieved context
 
-## Shared files
+**`langgraph_examples.ipynb`**
 
-| File | Description |
-|------|-------------|
-| `requirements.txt` | Python dependencies and environment setup notes |
-| `.env` | API keys (not committed); create locally with `OPENAI_API_KEY` |
+*LangGraph*
+- Defining a state, a chatbot node, and compiling/invoking a `StateGraph`
+- Conditional edges (three variants, differing in how the graph prints its conditions)
+- Reducer functions to keep message history, and the built-in `MessagesState` / `add_messages`
+- Removing messages with `RemoveMessage`
+- Summarizing long conversations
+- Persisting conversations with checkpoints (`InMemorySaver`)
+- Long-term memory with SQLite (`SqliteSaver`, written to `langgraph.db` next to the notebook and git-ignored)
 
 ## Setup
 
 1. Create and activate a conda environment (Python 3.9 recommended).
-2. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Add your OpenAI API key to a `.env` file:
+2. Add your OpenAI API key to a `.env` file (git-ignored) at the repo root or in the course folder:
 
 ```
 OPENAI_API_KEY=your-key-here
 ```
 
-4. Launch Jupyter and open the notebook for the course you are following.
+3. Install dependencies for the course you are following:
+
+```bash
+cd udemy-365-ai-agent-engineer-bootcamp
+pip install -r requirements.txt
+```
+
+   This also installs `langgraph` and `langgraph-checkpoint-sqlite` for `langgraph_examples.ipynb`.
+
+4. Launch Jupyter from that course folder and open its notebook, so relative paths to the sample documents resolve.
