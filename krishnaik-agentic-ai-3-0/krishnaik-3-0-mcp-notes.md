@@ -655,6 +655,206 @@ data: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"_meta":{"fastmcp":{"tags":[]}
 * docker container
 * pypi
   
+Login to prefect horizon and integrate the github link. Then deploy the mcp server as 
+```main.py:mcp```
+
+The drawback is this url it generated cannot connect to claude desktop because horizon requires authentication and cannot be turned off in free tier. 
+
+We can deploy in vercel by integrating
+github repo. Then turn off vercel authentication
+and connect throguh claude desktop connector.
+Note that vercel deployed it as a fastapi. 
+
+**Use MCP tools when** 
+
+
+You want the same tools usable from multiple clients or agents. Your time tracker now works in this chat, and would in Claude Code or Cursor, without writing any glue code.
+
+You don't control the client. You can't add custom function definitions to Claude.ai, but you can add a connector.
+
+You're publishing a capability for other people or teams to plug in.
+
+Tools change independently of the apps using them. You update the server and clients pick up the changes through discovery.
+
+#### MCP Client
+We can create an MCP client using the MCP or FastMCP SDK. The client can connect to an MCP server, perform initialization, discover available tools using tools/list, and invoke tools using tools/call. The tool result can then be provided to an LLM, which can interpret the result and generate the final response.
+
+This is similar to LangChain's tool-calling loop: the LLM determines which tool to use, the application executes the tool, and the tool result is sent back to the LLM so it can generate the final response. 
+
+LangChain's MCP integration can simplify this by discovering MCP tools and exposing them to the LangChain agent.
+
+mcp sdk tool call
+```
+"""
+SETUP:
+    pip install mcp
+
+RUN:
+    python3 01_raw_client.py
+"""
+import asyncio
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+# This describes HOW to start the server -- it does not start it yet.
+server_params = StdioServerParameters(
+    command="python3",
+    args=["../main.py"],
+)
+
+
+async def main():
+    # STEP 1: open the connection.
+    async with stdio_client(server_params) as (read_stream, write_stream):
+        # STEP 2: wrap a "session" around those two raw streams.
+        async with ClientSession(read_stream, write_stream) as session:
+            # STEP 3: the handshake.
+            await session.initialize()
+            print("Connected! Handshake complete.")
+
+            # STEP 4: ask what tools exist.
+            tools_response = await session.list_tools()
+            tool_names = [t.name for t in tools_response.tools]
+            print("Tools this server offers:", tool_names)
+
+            # STEP 5: call one of them for real.
+            result = await session.call_tool("list_projects", arguments={})
+            print("Result of calling list_projects:", result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+To run using Fast MCP as Stdio
+```
+import asyncio
+from fastmcp import Client
+    async with Client("../main.py") as client:  # steps 1, 2, AND 5 (cleanup), handled for you
+        tools = await client.list_tools()  # step 3
+        print("Tools:", [t.name for t in tools])
+
+        result = await client.call_tool("list_projects", {})  # step 4
+        print("Result:", result)
+    # step 5 (cleanup) already happened here, automatically, the instant the block ended
+```
+
+For calling as transport call to server
+```
+SERVER_URL = "https://time-tracker-livid-theta.vercel.app/mcp"
+
+
+async with Client(SERVER_URL) as client:
+```
+
+To make AI Model help with tool call decision
+* first make list tools call to mcp server
+* pass the list of tools to ai model using tools argument
+* once ai tell which tool to call make the tool call and provide that response to ai to generate more readable response
+* 
+#### MCP changes in latest version 2026-07-28
+In old system, client initialize a request and then server responds with session id. Client uses this session for the entire conversation to the end.
+
+In the new version, it is stateless.Every message carries everything about the request. 
+
+If nothing is "remembered" anymore, how does a server ever ask you a question in the middle of doing something? This is the neat part.
+
+That's the whole rule, really: a server can only ask you something while it's already working on a request you sent it. It can never just show up out of nowhere.
+
+
+
+
+**sampling**\
+Sampling in MCP
+Sampling is an MCP mechanism that lets an MCP server ask the MCP client to have an LLM generate or process something on the server's behalf.
+
+The current MCP SDK documentation explicitly says Sampling was deprecated in 2026-07-28 and recommends calling the LLM provider API directly from the server instead.
+
+below has code sample showing how sampling is done in older version between client and server. 
+https://chatgpt.com/share/6ab7ea2a-2fe4-83e9-8bda-476d585d91fc
+
+**elicitation**\
+In MCP (Model Context Protocol), **elicitation** means the MCP server asks the user for additional information that it needs in order to complete an operation.
+
+https://chatgpt.com/share/6ab5eb88-f374-83ea-a961-e6842335b1d4
+
+Older MCP: server calls ctx.elicit()
+Current MCP: use a resolver / multi-round-trip
+
+The client is created with elicitation handler hook. The server calls this hook when it need a confirmation from the client and this hook method on client side is called. Client can provide the confirmation back to server. 
+```
+ async with Client(
+        "../main.py", elicitation_handler=elicitation_handler, mode="legacy"
+    )
+```
+
+**ping**\
+client can ping the server to see if the connection is still live. it is applicable only for older server since new server mcp is stateless. 
+
+**error handling**\
+if client calls server with an invalid tool name or anything server can respond back with error which can be captured on client side
+
+we can set up timeout when creating client and if server fails to respond back with in that time, we get exception.
+```
+async with Client("../main.py", timeout=1.0) as client:
+```
+
+**progress handler**\
+we can set up client with a progress handler hook. Server can invoke the hook to provide periodic progress update. 
+```
+async with Client("../main.py", progress_handler=on_progress) as client:
+```
+
+| MCP capability | Who is being asked? | Who handles the action? | Purpose | Simple example |
+|---|---|---|---|---|
+| **Elicitation** | 👤 **User** | MCP **Client** collects the answer | Get information or confirmation from the **human** | Server needs the user's ZIP code |
+| **Sampling** | 🤖 **LLM through the Client** | MCP **Client's LLM** generates the response | Ask an LLM to reason, generate, summarize, classify, etc. | Server asks an LLM to summarize some data |
+| **Tool Call** | 🔧 **MCP Server** is being instructed | MCP **Server** executes the tool | Perform an actual operation | `create_reservation()` |
+| **Resource** | 📄 **Client/LLM** consumes data | MCP **Server** provides the data | Give the client/LLM contextual information | Read a file, database record, or API data |
+
+
+https://modelcontextprotocol.io/specification/2026-07-28/basic/versioning
+talks about versioning related compatability between client and server running on different versions of mcp. 
+
+Some advantages of new version
+* faster routing - because of additional info in each request - Mcp-Method and Mcp-Name label, right in the headers
+* smarter caching - new fields are ttlMs (how long an answer stays fresh, in milliseconds) and cacheScope (whether that cached answer is safe to share across many people, or private to just you)
+* no handshake - request is sent by client and server confirms the version and responds with response
+
+
+Sampling	A way for a server to ask the client's own connected AI model to help it out — say, to turn some raw data into a natural-language summary — instead of the server needing its own separate AI subscription
+
+Elicitation	A server pausing mid-task to ask the actual person a real question — for example, confirming an unusually large action before going ahead with it
+
+Ping	The simplest possible check — one side asking the other "are you still there?", with no other information exchanged
+
+Once the installed library actually negotiates the modern, letter-only protocol by default, those specific features hit real, reproducible errors — not because the code was wrong, but because the channel they relied on genuinely isn't there anymore on that connection.
+
+Feature	What happens now
+
+Sampling (ctx.sample())	The method itself no longer exists in the installed library
+
+Elicitation (ctx.elicit())	Still exists, but raises an error on the modern connection
+
+Ping (client.ping())	Still exists, but raises "Method not found" on the modern connection
+
+
+#### Langchain with MCP
+
+In LangChain, we can connect to an MCP server, retrieve its available
+tools and tool schemas, and use those MCP tools with a LangChain agent.
+
+We typically use `langchain-mcp-adapters` to connect MCP servers to
+LangChain and convert the MCP tools into tools that LangChain agents
+can use.
+
+LangChain is NOT used to create the MCP server itself.
+
+- **MCP Server** → created using the official `mcp` SDK or FastMCP.
+- **MCP Client connection** → handled through the MCP client/adapter.
+- **LangChain Agent** → uses the MCP tools exposed by the server.
+
+
 ### Additional references
 
 https://mcp-lifecycle.netlify.app/
@@ -662,3 +862,5 @@ https://mcp-lifecycle.netlify.app/
 https://mcp-legacy-vs-modern.netlify.app/
 
 https://github.com/mayank953/Live-Class-2026/tree/main/Complete%20MCP
+
+https://gofastmcp.com/clients/client

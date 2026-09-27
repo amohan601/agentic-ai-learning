@@ -1,0 +1,293 @@
+====================================================================
+MCP / FASTMCP PROTOCOL UPGRADE - WHAT BROKE, WHY, AND HOW IT WAS FIXED
+====================================================================
+Project: TimeTrackProject / mcp-client-and-advanced
+Installed version: fastmcp 4.0.5 (installed mcp SDK negotiates MCP
+protocol revision "2026-07-28" by default)
+Date of investigation: 2026-09-20
+
+
+--------------------------------------------------------------------
+1. THE ROOT CAUSE (read this first - it explains every bug below)
+--------------------------------------------------------------------
+
+The original course demos (05-09 in client/) were written against the
+OLDER, "session-based" MCP protocol. In that era, a client opens one
+persistent connection to a server and BOTH sides can send requests
+across it at any time. That back-channel is what let a SERVER tool
+pause mid-execution and ask the CLIENT to do something (call an LLM,
+ask the human a question, respond to a ping, etc).
+
+The newest MCP protocol revision, dated "2026-07-28", is a totally
+different shape: it is STATELESS. Every request is a single, self-
+contained HTTP-style exchange. There is no persistent back-channel at
+all. This is a deliberate spec change (see SEP-2577, SEP-2322,
+SEP-2575 in the MCP spec changelog), and fastmcp 4.0.5 (the version
+"uv" installed for this project) adopts this modern protocol by
+default whenever a client connects.
+
+Because of this, every feature that depended on "the server asks,
+the client answers, mid-tool-call" breaks the moment the installed
+library negotiates the modern protocol. That is the single cause
+behind every error we hit this session:
+
+    - ctx.sample()                    -> AttributeError (method deleted)
+    - ctx.elicit()                    -> "unavailable on 2026-07-28 connections"
+    - client.ping()                   -> "Method not found"
+    - (not yet tested, but same risk) -> client-to-server progress / cancellation
+                                          in 08_timeout_and_cancellation.py and
+                                          09_progress_notifications.py
+
+Two different kinds of fix were needed, because these features are
+NOT all in the same state of deprecation:
+
+
+--------------------------------------------------------------------
+2. TWO CLASSES OF FIX
+--------------------------------------------------------------------
+
+CLASS A - "Feature fully deleted from the library, no flag brings it back"
+    Applies to: ctx.sample() (server-initiated LLM sampling)
+    Why: FastMCP 4.x removed Context.sample() from the code entirely.
+         It isn't hidden behind a mode switch - the method just does
+         not exist anymore, on ANY connection mode. (We confirmed this
+         by installing fastmcp 2.14.7 in a scratch venv, where
+         Context.sample() still exists - so it really was deleted
+         between the 2.x and 4.x lines, not merely gated.)
+    Fix used: Rewrite the tool to call the LLM provider (Anthropic)
+         directly from inside the server tool, instead of asking the
+         connected client to do it. This matches where the MCP spec
+         is heading: "servers call a provider directly" instead of
+         "servers borrow the client's LLM."
+
+CLASS B - "Feature still exists in the library, but needs the classic handshake"
+    Applies to: ctx.elicit() (server asks a real yes/no question) and
+                client.ping() (basic liveness check)
+    Why: These still have code paths in fastmcp/mcp, but that code
+         path requires the OLD session-based connection. On a modern
+         (2026-07-28) connection there is no wire mechanism left for
+         the server to send an unsolicited request to the client, so
+         they raise instead of silently failing.
+    Fix used: Pass mode="legacy" when constructing the Client(...).
+         This forces the classic initialize handshake (byte-identical
+         to pre-v4 FastMCP behavior), which restores the persistent
+         back-channel and makes ctx.elicit() / client.ping() work
+         exactly as originally taught. No server-side rewrite needed.
+
+    NOTE: elicitation DOES have a real "modern, 2026-07-28-native"
+    replacement in the library (a tool returns an InputRequiredResult
+    object and gets re-invoked later with the human's answer - a
+    "guard/return" pattern for stateless connections). We deliberately
+    did NOT use that pattern here because it requires restructuring
+    the tool as a re-entrant, resumable function, which is a much
+    bigger rewrite than the lesson calls for. mode="legacy" was chosen
+    instead to keep the teaching material's simple, linear ctx.elicit()
+    shape intact.
+
+
+--------------------------------------------------------------------
+3. FILE-BY-FILE CHANGES MADE
+--------------------------------------------------------------------
+
+--- main.py ---
+    - Added: `import os` and `from anthropic import Anthropic`
+    - Added: `anthropic_client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))`
+      at module load time.
+    - Tool `summarize_week`:
+        BEFORE: took a `ctx: Context` parameter and called
+                `await ctx.sample(prompt_text)`, which paused the tool
+                and asked the connected CLIENT to run the LLM call.
+        AFTER:  no longer takes `ctx`. Calls
+                `anthropic_client.messages.create(model="claude-sonnet-4-5", ...)`
+                directly inside the tool. The server now talks to
+                Anthropic itself; the client just gets the finished
+                text back like any normal tool result.
+    - Practical effect: ANTHROPIC_API_KEY must now be available to the
+      SERVER process (main.py), not the client script.
+
+--- client/05_sampling_demo.py ---
+    - Removed the `sampling_handler` function and the client-side
+      `Anthropic` client entirely - the client no longer needs to run
+      any LLM call, because the server now does that itself.
+    - Removed `sampling_handler=sampling_handler` from the Client(...)
+      constructor call.
+    - Built an explicit `PythonStdioTransport("../main.py", env={...})`
+      instead of the old `Client("../main.py")` string-inferred form.
+      This was REQUIRED, not optional - see section 4 below
+      ("stdio subprocess environment isolation").
+    - main() is now a plain `client.call_tool("summarize_week", ...)`
+      call with no special handler.
+
+--- client/06_elicitation_demo.py ---
+    - Added `mode="legacy"` to the Client(...) constructor.
+    - Updated the module docstring to explain that plain ctx.elicit()
+      requires the legacy handshake on this fastmcp version (the old
+      docstring incorrectly claimed elicitation "survives into the
+      newest protocol revision" - it does NOT, in the simple imperative
+      form this demo uses).
+    - No other logic changes - elicitation_handler and the two
+      call_tool() calls are unchanged.
+
+--- client/07_ping_and_errors.py ---
+    - Added `mode="legacy"` to BOTH Client(...) constructor calls
+      (one inside demo_ping(), one inside demo_real_error()).
+    - Updated the docstring to explain why.
+    - No other logic changes.
+
+--- NOT YET TOUCHED ---
+    - client/08_timeout_and_cancellation.py
+    - client/09_progress_notifications.py
+      These were not run or modified this session. Given the same
+      deprecation family (client-to-server progress and cancellation
+      semantics are also called out as legacy-only in the installed
+      library's own source comments), they are LIKELY to need the
+      same `mode="legacy"` treatment on their Client(...) calls. Test
+      them the same way: run as-is first, and if you see an error
+      mentioning "2026-07-28" or "unavailable on ... connections",
+      add mode="legacy" to that file's Client(...) call(s).
+
+
+--------------------------------------------------------------------
+4. STDIO SUBPROCESS ENVIRONMENT ISOLATION (separate bug, easy to miss)
+--------------------------------------------------------------------
+
+Independent of the protocol-era issue, we hit a second, unrelated
+problem while testing summarize_week:
+
+    TypeError: "Could not resolve authentication method. Expected one
+    of api_key, auth_token, or credentials to be set..."
+
+even though ANTHROPIC_API_KEY WAS exported in the shell before running
+`uv run python3 05_sampling_demo.py`.
+
+CAUSE: fastmcp's stdio Client spawns the MCP server (main.py) as a
+CHILD PROCESS. By default, the underlying MCP SDK does NOT hand that
+child process your full shell environment. It only forwards a small,
+explicit safe-list of variables (PATH, HOME, USER, etc. - see
+mcp/client/stdio.py: DEFAULT_INHERITED_ENV_VARS /
+get_default_environment()). Anything else, including custom variables
+like ANTHROPIC_API_KEY, is silently dropped unless you pass it in
+explicitly.
+
+FIX: construct the transport explicitly and pass env=:
+
+    from fastmcp.client.transports import PythonStdioTransport
+    transport = PythonStdioTransport(
+        "../main.py",
+        env={"ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", "")},
+    )
+    async with Client(transport) as client:
+        ...
+
+TEACHING POINT: whenever a demo's server-side tool needs an API key /
+secret and the demo is run over stdio, remind learners that "export
+FOO=bar" in their shell is NOT automatically visible inside the spawned
+MCP server process. They must forward it explicitly through the
+transport's `env` parameter (or construct env=os.environ.copy() if
+they want to forward everything, which is less safe but sometimes
+convenient for local demos).
+
+
+--------------------------------------------------------------------
+5. ANTHROPIC API KEY "WORKSPACE" ERROR (a THIRD, unrelated issue)
+--------------------------------------------------------------------
+
+Once the env-forwarding fix above was in place, we hit a THIRD, fully
+separate error:
+
+    BadRequestError: Error code: 400 - 'This API key is not scoped to
+    a workspace, so this request must include the anthropic-workspace-id
+    header...'
+
+This is NOT a code bug. It means the specific API key used was an
+org-level/admin key rather than a normal workspace-scoped API key.
+FIX: go to https://console.anthropic.com/settings/keys, and generate
+a new key from INSIDE a specific workspace (not an org-wide admin
+key). A plain workspace-scoped key does not need any extra headers.
+
+SECURITY NOTE FOR THE LEARNERS: during this session, a real API key
+was pasted directly into the chat (twice). That is a real secret
+exposure - the key should be treated as compromised and revoked/
+rotated immediately, and a fresh key stored only in a local .env file
+or exported in the shell, never typed into a chat window, ticket, or
+committed to git. This is worth calling out explicitly to learners as
+a "never do this" moment.
+
+
+--------------------------------------------------------------------
+6. QUICK REFERENCE - WHAT WORKS NOW, HOW TO RUN IT
+--------------------------------------------------------------------
+
+05_sampling_demo.py
+    - Status: CODE CONFIRMED WORKING (reaches Anthropic correctly with
+      auth headers attached and the key forwarded to the subprocess).
+      Full success still pending a valid, workspace-scoped
+      ANTHROPIC_API_KEY on the learner's end.
+    - Run:
+        export ANTHROPIC_API_KEY=your-workspace-scoped-key
+        cd client
+        uv run --active python3 05_sampling_demo.py
+    - Teaches: servers calling an LLM provider directly (the CURRENT
+      recommended MCP pattern), plus the stdio env-forwarding gotcha.
+
+06_elicitation_demo.py
+    - Status: TESTED, WORKING END TO END.
+    - Run:
+        cd client
+        uv run --active python3 06_elicitation_demo.py
+    - Teaches: ctx.elicit() pausing a tool to ask the human a real
+      question, PLUS the mode="legacy" escape hatch needed to keep
+      that pattern working on the newest fastmcp/mcp release.
+
+07_ping_and_errors.py
+    - Status: TESTED, WORKING END TO END. (The big red traceback panel
+      that prints for demo_real_error() is FastMCP's own server-side
+      error logging to the terminal, not a crash - the script goes on
+      to catch and print the error correctly.)
+    - Run:
+        cd client
+        uv run --active python3 07_ping_and_errors.py
+    - Teaches: basic ping/liveness check (now legacy-only) and how a
+      real tool-side exception surfaces back to the client as a
+      catchable protocol error.
+
+08_timeout_and_cancellation.py, 09_progress_notifications.py
+    - Status: NOT YET TESTED THIS SESSION.
+    - If they fail with an error mentioning "2026-07-28" or
+      "unavailable on ... connections", apply the same fix as 06/07:
+      add mode="legacy" to their Client(...) constructor call(s).
+
+
+--------------------------------------------------------------------
+7. THE ONE-LINE MENTAL MODEL FOR LEARNERS
+--------------------------------------------------------------------
+
+"The newest MCP protocol has no back-channel at all - the server can
+no longer interrupt the client mid-call for ANYTHING. Features that
+depended on that (sampling, elicitation, ping, progress) either got
+deleted outright (sampling - call the LLM yourself now) or still exist
+but need you to explicitly opt back into the old, session-based
+handshake with mode='legacy' on the Client."
+
+
+--------------------------------------------------------------------
+8. AN ALTERNATIVE NOT TAKEN (worth mentioning to advanced learners)
+--------------------------------------------------------------------
+
+Instead of adapting each demo, the whole project's fastmcp dependency
+could have been pinned back to the 2.x line (e.g. fastmcp==2.14.7,
+confirmed via a scratch venv to still have Context.sample() etc.),
+which would have made ALL of these demos work completely unmodified,
+matching the course material exactly as originally written.
+
+We deliberately did NOT do this, per your choice, because:
+    - It downgrades a core dependency for the WHOLE project, not just
+      one lesson.
+    - It moves the course further from the direction the MCP spec is
+      actually heading (server calls providers directly; sessionless
+      protocol), which has real value for learners preparing for
+      current best practice.
+
+Worth surfacing as a discussion point in class: "here is the
+old-course-compatible option we didn't take, and why."
+====================================================================

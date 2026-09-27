@@ -175,3 +175,10 @@ With system prompt it is left to the model to decide what tool to call. With wra
 
 __24.What is a headless tool, and how is its execution model fundamentally different from every other tool pattern covered in this course? Name one realistic capability that could only be implemented this way.__
 A headless tool has its schema registered on the server (so the model can call it normally), but its actual EXECUTION happens on the CLIENT — typically a browser — via an interrupt/resume handshake, rather than running in the Python process. Example: reading the user's real-time geolocation from the browser's Geolocation API — a Python server has no way to access that directly; only client-side code can.
+
+
+
+## Part B — Coding Exercises
+All exercises use GreenPlate, a restaurant reservation and food ordering assistant. Each question gives you a blank code cell to work in — write your solution there and run it to confirm it works before moving on.
+
+Link to IPYNB file with code changes

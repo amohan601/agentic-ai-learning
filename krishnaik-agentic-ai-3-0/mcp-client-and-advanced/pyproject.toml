@@ -1,0 +1,10 @@
+[project]
+name = "mcp-client-and-advanced"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp",
+    "mcp",
+    "anthropic",
+    "load-dotenv>=0.1.0",
+]
