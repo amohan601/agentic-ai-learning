@@ -498,7 +498,7 @@ result = model.invoke([
 ```
 ## Structured Outputs
 
-Code for this section <a href="langchain-structured-schema.ipynb" target="_blank">Code for structured output</a>
+Code for this section <a href="krishnaik-3-0-langchain-structured-schema.ipynb" target="_blank">Code for structured output</a>
 
 ### Structured Output Schema 
 
@@ -700,7 +700,7 @@ agent = create_agent(
 
 
 ## Tools
-<a href="langchain-tools.ipynb" target="_blank">Tools code doc</a>
+<a href="krishnaik-3-0-langchain-tools.ipynb" target="_blank">Tools code doc</a>
 
 You can attach tool to model. Tool is a function with optional arguments and optional return type defined with @tool. Docstring is needed for model to understand the description of tool. Tool -> Args with type hints. Tools are just glorified Functions/API Calls. Any time agent has to talk to outside things then we can use tools. You can overwrite name using @tool("mycustomname",description="my custom description") especially useful if someone else created tool and you are using it. 
 ```
@@ -936,7 +936,7 @@ def recall_travel_style(user_id: str, runtime: ToolRuntime) -> str:
 ![Middleware diagram.](images/middleware1.png "Middleware")
 
 Code for this section 
-<a href="langchain-middleware.ipynb" target="_blank">langchain-middleware.ipynb</a>
+<a href="krishnaik-3-0-langchain-middleware.ipynb" target="_blank">krishnaik-3-0-langchain-middleware.ipynb</a>
 * Pre-Built in middleware
 * Custom middleware
 
@@ -1733,7 +1733,7 @@ agent = create_agent(
 
 <a href="https://colab.research.google.com/drive/1dFuLlELzyS2NDIBgeVOowrqGJGFPERSL?usp=sharing" target="_blank">Agent Runtime colab </a> 
 
-<a href="langchain-agentstate-runtime.ipynb" target="_blank">Code example created</a> 
+<a href="krishnaik-3-0-langchain-agentstate-runtime.ipynb" target="_blank">Code example created</a> 
 
 ### Agent State
 <a href="https://docs.langchain.com/oss/python/langchain/agents#agent-state" target="_blank">Agent State docs</a> 

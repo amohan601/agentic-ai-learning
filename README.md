@@ -15,6 +15,7 @@ Folder: `krishnaik-agentic-ai-3-0/`
 |------|-------------|
 | `krishnaik-3-0-langchain-notes.md` | Course notes: models/messages, prompt templates, structured output, tools, `ToolRuntime`, middleware, HITL |
 | `krishnaik-3-0-mcp-notes.md` | Course notes on MCP (host/client/server architecture, server types, MCP JAM, streamable HTTP) |
+| `krishnaik-3-0-multi-agent-notes.md` | Short notes on multi-agent patterns (subagent, parallel, controller/router, reactive, hierarchical, planner-executor) |
 | `krishnaik-3-0-1-assignment-langchain.md` | Assignment 1, Part A: written Q&A covering agents/harness, messages, structured output, and tools |
 | `krishnaik-3-0-1-assignment-langchain-part-b.ipynb` | Assignment 1, Part B: my coding-exercise solutions (a `@tool`, a `ChatPromptTemplate`, a constrained-field Pydantic `FoodOrder` schema, and the Medium exercises) |
 | `krishnaik-3-0-langchain-tools.ipynb` | Defining and using LangChain tools with `init_chat_model` |
@@ -22,6 +23,7 @@ Folder: `krishnaik-agentic-ai-3-0/`
 | `krishnaik-3-0-langchain-agentstate-runtime.ipynb` | Agent state, context/tool runtime, dynamic prompting, human-in-the-loop with `interrupt`/`Command` |
 | `krishnaik-3-0-langchain-middleware.ipynb` | Prebuilt middleware (summarization, HITL, model/tool-call limits, PII, retry, tool selector, shell) and custom middleware |
 | `krishnaik-3-0-mcp-projects/` | Runnable MCP examples: `mcp-warmup`, `my-first-mcp` (recipe box), and `TimeTrackProject` (time-tracking MCP server + web app) |
+| `mcp-client-and-advanced/` | Self-contained MCP *client*-side project: a full TimeTrack server plus 9 numbered client scripts covering raw `stdio_client`, FastMCP clients, an agent loop, sampling, elicitation, ping/errors, timeouts/cancellation, and progress notifications |
 | `images/` | Diagrams and screenshots referenced from the notes files |
 
 ### Topics covered
@@ -40,6 +42,10 @@ Folder: `krishnaik-agentic-ai-3-0/`
 - MCP server types and transports (stdio, streamable HTTP)
 - Connecting local tools/servers via MCP JAM
 - Using the time-tracking MCP server from Claude
+
+**`krishnaik-3-0-multi-agent-notes.md`**
+- Why hand a subtask to another agent: context isolation and reduced context overloading
+- Multi-agent patterns: subagent, parallel agent, chain of agents, controller/router agent, reactive agent (evaluator + feedback loop), hierarchical agent, planner-executor agent
 
 **`krishnaik-3-0-1-assignment-langchain.md`** (Part A)
 - Agent vs. harness, the Lang product family (LangChain/LangGraph/LangSmith/Deep Agents)
@@ -72,9 +78,18 @@ Folder: `krishnaik-agentic-ai-3-0/`
 - Prebuilt middleware: summarization, HITL, model-call limit, model fallback, tool-call limit, PII (incl. regex checks), todo list, `LLMToolSelectorMiddleware`, `ToolErrorMiddleware`, `ToolRetryMiddleware`, `LLMToolEmulator`, `ShellToolMiddleware`
 - Custom middleware, including dynamic model switching and class-based middleware
 
+**`mcp-client-and-advanced/`**
+- Building an MCP client from scratch: the raw low-level `stdio_client()` vs. FastMCP's `async with` client
+- Connecting over stdio vs. to a live, deployed streamable-HTTP server
+- A real agent loop built without a framework, driving MCP tool calls directly
+- Advanced protocol features: sampling (server borrows the client's LLM), elicitation (server asks a mid-task question), ping/error handling, timeouts and cancellation, and progress notifications
+- See [`mcp-client-and-advanced/README.md`](krishnaik-agentic-ai-3-0/mcp-client-and-advanced/README.md) for the full file layout and run order
+
 ### Running the MCP projects
 
 Each project under `krishnaik-3-0-mcp-projects/mcp/quick-mcp/` is a [uv](https://docs.astral.sh/uv/) project. `.venv/` is not committed; `uv run` (or `uv sync`) recreates it from `pyproject.toml` and `uv.lock`.
+
+`mcp-client-and-advanced/` is also a uv project (`uv sync`), with its own `.env` (git-ignored) for `ANTHROPIC_API_KEY` — see its own README for the numbered run order.
 
 ## 365 Careers (Udemy Bootcamp)
 
