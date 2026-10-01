@@ -138,8 +138,9 @@ MCP uses JSON-RPC because MCP needs a standardized, transport-independent RPC me
 
 #### Initialization
 
-** Structure ** 
+**Structure** 
 <a href="https://mcp-lifecycle.netlify.app/">mcp lifecycle docs from mayank</a>
+
 <a href="https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle">mcp lifecycle docs</a>
 
 * Step 1 -
@@ -172,7 +173,7 @@ After this, they are connected for the whole session.
 In this connection is not open, once client send request it forgets it. Server sends back another request (which is a response of request from client) to provide update. 
 
 
-** Version negotiation in handshake** 
+**Version negotiation in handshake** 
 
 * client sends it version(latest supported)
 * server sends back its version(latest supported)
@@ -220,11 +221,11 @@ In this phase actual tool call happens with tools/call and passing the arguments
 shutdown depends on the type of connection made between client and server. 
 
 **if mcp server is running locally** \
-Stdio process - client connects with server running in same machine through stdio process. Example terminal running python program where terminal is client and poython program is server they talk trhough stdio to take input and get output. If they are running on same machine just close the stdio connection is enough to shutdown. Usually in this case server is running in local machine where Host and Client exist. 
+Stdio process - client connects with server running in same machine through stdio process. Example terminal running python program where terminal is client and python program is server they talk through stdio to take input and get output. If they are running on same machine just close the stdio connection is enough to shutdown. Usually in this case server is running in local machine where Host and Client exist. 
 * fast connection - since both running on same system 
 * secure - since both running on same system 
 * simple
-In STDIO, No JSON-RPC message is exchanged during shutdown at all. The entire responsibility shifts to the transport layer.
+In STDIO, No JSON-RPC message is exchanged during shutdown at all. The entire responsibility shifts to the transport layer. Client closes its writing side (stdin) → the MCP server sees EOF on its stdin.
 
 **if mcp server is running remote** \
 Streamable http - client talks to server over http protocol using post request. client can close connection. The url is ending in /mcp. 
@@ -313,6 +314,8 @@ uv --directory <folder where python file is present> run python mcp_with_primiti
 
 ```
 
+
+
 ![MCP-JAM-Connect local tools diagram.](images/mcp-mcpjam-localtools.png "MCP JAM local server tools")
 
 ![MCP-JAM-Connect to local diagram.](images/mcp-mcpjam-localserver.png "MCP JAM connect STDIO to local server")
@@ -324,12 +327,20 @@ Below command is run in the folder where your mcp server code is present. It wil
 ```
 uv run fastmcp run mcp_with_primitives.py --transport http --port 8000
 
+
+uv run fastmcp run mcp_with_primitives.py
+│  │   │       │
+│  │   │       └── FastMCP's "run" command
+│  │   └────────── FastMCP CLI
+│  └────────────── uv's "run" command
+└───────────────── uv
 ```
 Using the above URL you can connect from MCPJAM now. 
 
 ![MCP Streamable HTTP connected.](images/mcp-http-connected.png "MCP Streamable HTTP connected")
 
 **mcp libraries**
+
 **mcp library**
 * from official Claude/Anthropic
 * In this version using mcp library you have to write more low level code where you have to define on your own list_tools and call_tools method and define your tools in there manually. 
@@ -338,6 +349,7 @@ Using the above URL you can connect from MCPJAM now.
 pip install mcp
 ```
 **fastmcp library** 
+
 * with this library you just define your tools alone using @mcp.tool decorator. You dont define list or call tools method yourself. 
 ```
 pip install fastmcp
@@ -349,16 +361,34 @@ CLIENT_PORT=6280 npx @modelcontextprotocol/inspector python3 mcp_with_primitives
 ```
 **Adding MCPServer in Claude desktop**
 
-To add this MCP server as a connector to claude desktop run the below comman.d
+To add this MCP server as a connector to claude desktop run the below command. This will add the mcp server to claude config to start the MCP Server as STDIO process
+
 ```
 uv run  fastmcp install claude-desktop recipebox_fastmcp.py
+```
+
+In claude config
+```
+{
+  "mcpServers": {
+    "recipebox": {
+      "command": "uv",
+      "args": [
+        "run",
+        "fastmcp",
+        "run",
+        "recipebox_fastmcp.py"
+      ]
+    }
+  }
+}
 ```
 You can see this connector when you open claude desktop. If you want to remove it, 
 go to terminal and run nano ~/Library/Application\ Support/Claude/claude_desktop_config.json
 Edit the file and remove the specific server added under mcpservers file. 
 CNTRL + 0 and CNTRL+X to save and exit. 
 
-
+Note that in here FastMCP automatically modifies Claude Desktop's MCP configuration for you.
 
 #### Integrate MCPServers with Claude
 
@@ -370,6 +400,7 @@ We can connect to third party MCP servers from our code using MCPClient using co
 **local servers**\
 we can use config file to add local mcpservers. 
 if you installed local mcp server to claude using above command it wont show up in claude connectors. For that you have to go to developer -> manage your local mcp servers > Edit Config. This will open claude_desktop_config.json and you can add your local mcp server there. If you want recipebox to show up in connectors then you need to edit config to include path to uv (using which uv). Once below is saved into claude config, and now if we restart claude we can see the connector connecting to our local server. The files we link in developer tool, can be node or python or docker based. 
+We can ourselves set up mcp server to start as STDIO usin claude connector as below by editing the file ourselves. 
 
 ```
 {
@@ -465,6 +496,11 @@ You create FASTAPI and FastMCP server.
                        |
                     SQLite
 ```
+
+MCP Server code
+https://github.com/amohan601/agentic-ai-learning/tree/main/krishnaik-agentic-ai-3-0/krishnaik-3-0-mcp-projects/mcp/quick-mcp
+
+
 ```mcp_app = mcp.http_app(path="/").```  This creates a streamable mcp server. Or use ```mcp.run()``` with transport as streamable
 
 if you want to start your project as STDIO you should have main invocation with ```mcp.run()``` with default transport as STDIO
@@ -677,6 +713,11 @@ You're publishing a capability for other people or teams to plug in.
 Tools change independently of the apps using them. You update the server and clients pick up the changes through discovery.
 
 #### MCP Client
+
+MCP Client full python to using model.
+https://github.com/amohan601/agentic-ai-learning/tree/main/krishnaik-agentic-ai-3-0/mcp-client-and-advanced
+
+
 We can create an MCP client using the MCP or FastMCP SDK. The client can connect to an MCP server, perform initialization, discover available tools using tools/list, and invoke tools using tools/call. The tool result can then be provided to an LLM, which can interpret the result and generate the final response.
 
 This is similar to LangChain's tool-calling loop: the LLM determines which tool to use, the application executes the tool, and the tool result is sent back to the LLM so it can generate the final response. 
@@ -787,6 +828,11 @@ The client is created with elicitation handler hook. The server calls this hook 
         "../main.py", elicitation_handler=elicitation_handler, mode="legacy"
     )
 ```
+What does "legacy" mean? \
+It means: \
+Use the older/session-based MCP initialization handshake.
+
+With ```mode="auto"``` The client tries to negotiate the modern protocol first and falls back to the legacy handshake when necessary. 
 
 **ping**\
 client can ping the server to see if the connection is still live. it is applicable only for older server since new server mcp is stateless. 
@@ -828,15 +874,6 @@ Elicitation	A server pausing mid-task to ask the actual person a real question �
 
 Ping	The simplest possible check — one side asking the other "are you still there?", with no other information exchanged
 
-Once the installed library actually negotiates the modern, letter-only protocol by default, those specific features hit real, reproducible errors — not because the code was wrong, but because the channel they relied on genuinely isn't there anymore on that connection.
-
-Feature	What happens now
-
-Sampling (ctx.sample())	The method itself no longer exists in the installed library
-
-Elicitation (ctx.elicit())	Still exists, but raises an error on the modern connection
-
-Ping (client.ping())	Still exists, but raises "Method not found" on the modern connection
 
 
 #### Langchain with MCP
@@ -854,6 +891,139 @@ LangChain is NOT used to create the MCP server itself.
 - **MCP Client connection** → handled through the MCP client/adapter.
 - **LangChain Agent** → uses the MCP tools exposed by the server.
 
+The MCPAdapter is built on top of FactMCP for creating the client. 
+we can use in memory mcp server, local mcp server with main.py or remote http mcp server. Pass URL, Path to python file or mcp server app itself.
+The adapter.list_tools() return tools information compatible to be used by langchain agent. 
+
+```
+from fastmcp import FastMCP
+mcp_inmemory = FastMCP()
+@mcp_inmemory.tool
+def add(a,b):
+    print(f'in memory mcp adding {a} and {b}')
+    return a+b
+
+async def mcp_inmemory_func(message):
+    async with MCPAdapter(mcp_inmemory) as adapter:
+        tools = await adapter.list_tools()
+        print([("name-",t.name, " arguments=",t.args_schema["properties"]) for t in tools])
+        agent = create_agent( "openai:gpt-5-mini", tools= tools)
+        print(message)
+        return await agent.ainvoke({ "messages":[HumanMessage(message)]})
+
+result = await mcp_inmemory_func('add 2 and 3 ')
+print(result["messages"][-1].content)    
+```
+https://docs.langchain.com/oss/python/langchain/mcp/tools
+
+**several servers with one connection**
+
+Several servers with one connection can be done using MCPConfig dictionary.
+```
+CONFIG = {
+    "mcpServers": {
+        "weather": {"command": "python", "args": ["/path/to/weather_server.py"]},
+        "calc": {"command": "python", "args": ["/path/to/calc_server.py"]},
+    }
+}
+
+
+async def fleet_agent(config):
+    async with MCPAdapter(config) as adapter:
+```
+
+**s
+
+**several servers each with different connection**
+
+
+If we want different auth for different servers, then use ClientGroup
+
+```
+from fastmcp.client import Client
+from fastmcp.client.group import ClientGroup
+from langchain.agents import create_agent
+from langchain.mcp import MCPAdapter
+
+
+async def agent_from_group(legacy_url: str, modern_url: str):
+    # One connection per server: a `ClientGroup` keeps each server on its own
+    # negotiated protocol era, so a legacy and a modern server run side by side.
+    # It also namespaces every tool as `{server}_{tool}`, so two servers exposing
+    # the same tool name stay distinct.
+    group = ClientGroup(
+        {
+            "weather": Client(legacy_url, mode="legacy"),
+            "calc": Client(modern_url, mode="auto"),
+        }
+    )
+    async with MCPAdapter(group) as adapter:
+```
+
+Most remote MCP servers require authentication. MCPAdapter delegates auth to FastMCP, so any credential a fastmcp.Client accepts works: a static bearer token, a full OAuth 2.1 flow, or any httpx.Auth.
+
+Bearer/OAuth token
+```
+from fastmcp import Client
+client = Client(
+    "https://my-server.com/mcp",
+    auth=BEARER_TOKEN
+)
+
+async with MCPAdapter(client) as adapter:
+
+
+auth = OAuth(
+    scopes=["user"]
+)
+
+mcp_client = Client(
+    "https://my-server.com/mcp",
+    auth=oauth
+)
+
+async with MCPAdapter(mcp_client) as adapter:
+```
+
+**Structured output content** \
+If the tool has structured output content use 
+```structured = message.artifact["structured_content"]``` to get the structured output.
+```
+## structured output
+from fastmcp import FastMCP
+import random 
+from pydantic import BaseModel,Field
+from langchain_core.messages import ToolMessage
+
+mcp_inmemory = FastMCP()
+@mcp_inmemory.tool
+def reserve_seats(name: str, seats: int) -> dict:
+    return {
+        "name": name,
+        "seats": seats,
+        "id": f"R {random.randint(1,100)}"
+        }
+
+class Reservation(BaseModel):
+    name: str = Field("Name of person booked")
+    seats: int =Field("number of seats booked")
+    id: str = Field("Booking ID")
+
+    
+async def reserve_seats_agent(message):
+    async with MCPAdapter(mcp_inmemory) as adapter:
+        tools = await adapter.list_tools()
+        agent = create_agent( "openai:gpt-5-mini", tools= tools, response_format = Reservation)
+        print(message)
+        return await agent.ainvoke({ "messages":[HumanMessage(message)]})
+
+result = await reserve_seats_agent('book one seat for aj123')
+for res in result["messages"]:
+    if isinstance(res, ToolMessage):
+        print(res.artifact)
+
+```
+This prints out ```{'structured_content': {'name': 'aj123', 'seats': 1, 'id': 'R 83'}}```
 
 ### Additional references
 
@@ -864,3 +1034,5 @@ https://mcp-legacy-vs-modern.netlify.app/
 https://github.com/mayank953/Live-Class-2026/tree/main/Complete%20MCP
 
 https://gofastmcp.com/clients/client
+
+https://docs.langchain.com/oss/python/langchain/mcp#example-query-langchain-docs
