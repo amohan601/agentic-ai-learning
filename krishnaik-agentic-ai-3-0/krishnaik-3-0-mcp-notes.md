@@ -1445,3 +1445,13 @@ https://github.com/mayank953/Live-Class-2026/tree/main/Complete%20MCP
 https://gofastmcp.com/clients/client
 
 https://docs.langchain.com/oss/python/langchain/mcp#example-query-langchain-docs
+
+<a href="./MCP in Langchain/MCP_MultiServer_Live_Demo.ipynb">Demo of multi server connection</a>
+
+<a href="./notebooks/langchain-mcp.ipynb">Langchain MCP notebook</a>
+
+<a href="./MCP in Langchain/">Mayank Code changes for this section</a>
+
+<a href="https://github.com/mayank953/Live-Class-2026/blob/main/Complete%20MCP/first-mcp-server/recipebox_lowlevel.py">Low level code for recipebox example</a>
+
+<a href="./mcp-client-and-advanced/">MCP-Warm up,Recipebox mcp, TimeTrack MCP </a>
