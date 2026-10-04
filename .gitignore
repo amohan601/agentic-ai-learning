@@ -8,7 +8,7 @@ venv/
 .venv/
 env/
 ENV/
-
+*.log
 
 # Python bytecode and build output
 __pycache__/
