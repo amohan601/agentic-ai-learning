@@ -65,5 +65,5 @@ not, deploying the whole app to a general host like Railway is the fallback.
 - `main.py` — FastAPI app with MCP mounted in, using the verified-correct
   mounting pattern
 - `static/` — the original frontend (3 tabs: entries, summary, log time)
-- `timetrack_notebook.ipynb` — full walkthrough, database layer fully executed
+- `../timetrack_notebook.ipynb` — full walkthrough, database layer fully executed
   live

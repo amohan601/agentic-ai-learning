@@ -9,6 +9,7 @@ venv/
 env/
 ENV/
 
+
 # Python bytecode and build output
 __pycache__/
 *.py[cod]
@@ -20,6 +21,8 @@ wheels/
 # OS / notebook junk
 .DS_Store
 .ipynb_checkpoints/
+.virtual_documents/
+anaconda_projects/
 
 # Local data and scratch notes
 *.db

@@ -885,6 +885,9 @@ We typically use `langchain-mcp-adapters` to connect MCP servers to
 LangChain and convert the MCP tools into tools that LangChain agents
 can use.
 
+The newest package of mcp support from langchain is provided through `langchain-mcp`
+We still get beta warning error when we use this since it is still very new. 
+
 LangChain is NOT used to create the MCP server itself.
 
 - **MCP Server** → created using the official `mcp` SDK or FastMCP.
@@ -893,7 +896,46 @@ LangChain is NOT used to create the MCP server itself.
 
 The MCPAdapter is built on top of FactMCP for creating the client. 
 we can use in memory mcp server, local mcp server with main.py or remote http mcp server. Pass URL, Path to python file or mcp server app itself.
+
+we can configure stdio explicitly as well or let MCPAdapter set it up as stdio as well. 
+
 The adapter.list_tools() return tools information compatible to be used by langchain agent. 
+
+https://docs.langchain.com/oss/python/langchain/mcp/tools
+
+**setting up with python stdio transport**
+This option allows us with flexibility to add log file location as well. 
+
+```
+from pathlib import Path
+from langchain.mcp import MCPAdapter
+from fastmcp.client.transports import PythonStdioTransport
+
+cinebot_mcp_transport = PythonStdioTransport(
+    script_path=Path("../MCP in Langchain/cinebot_mcp_server.py"),
+    log_file=Path("cinebot_mcp_server.log")
+)
+
+async with MCPAdapter(cinebot_mcp_transport) as mcp_adapter:
+    # Now you can use the mcp_adapter to interact with the MCP server
+    tools=await mcp_adapter.list_tools()
+    print("Available tools:", [t.name for t in tools])
+```
+
+**automatically creating stdio adapter without explicit stdiotransport**
+```
+from pathlib import Path
+from langchain.mcp import MCPAdapter
+
+stdio_adapter = MCPAdapter(Path("../MCP in Langchain/cinebot_mcp_server.py"))
+
+tools=await stdio_adapter.list_tools()
+print("Available tools:", [t.name for t in tools])
+```
+
+
+
+**In memory MCP client set up using langchain mcp**
 
 ```
 from fastmcp import FastMCP
@@ -914,78 +956,136 @@ async def mcp_inmemory_func(message):
 result = await mcp_inmemory_func('add 2 and 3 ')
 print(result["messages"][-1].content)    
 ```
-https://docs.langchain.com/oss/python/langchain/mcp/tools
 
-**several servers with one connection**
-
-Several servers with one connection can be done using MCPConfig dictionary.
-```
-CONFIG = {
-    "mcpServers": {
-        "weather": {"command": "python", "args": ["/path/to/weather_server.py"]},
-        "calc": {"command": "python", "args": ["/path/to/calc_server.py"]},
-    }
-}
+**calling the tool directly**
 
 
-async def fleet_agent(config):
-    async with MCPAdapter(config) as adapter:
-```
+we can invoke the tool either directly or indirectly through agent once we get list of tools.
 
-**s
-
-**several servers each with different connection**
-
-
-If we want different auth for different servers, then use ClientGroup
+if we used async mcp adapter we need to ensure tool is invoked using await with ainvoke
 
 ```
-from fastmcp.client import Client
-from fastmcp.client.group import ClientGroup
-from langchain.agents import create_agent
-from langchain.mcp import MCPAdapter
+showtime_tool = next((t for t in tools if t.name == "check_showtimes"), None)
 
-
-async def agent_from_group(legacy_url: str, modern_url: str):
-    # One connection per server: a `ClientGroup` keeps each server on its own
-    # negotiated protocol era, so a legacy and a modern server run side by side.
-    # It also namespaces every tool as `{server}_{tool}`, so two servers exposing
-    # the same tool name stay distinct.
-    group = ClientGroup(
-        {
-            "weather": Client(legacy_url, mode="legacy"),
-            "calc": Client(modern_url, mode="auto"),
-        }
-    )
-    async with MCPAdapter(group) as adapter:
+    # since we are using async mcp client - mcp adapter with async we need to use await and ainvoke
+    direct_result = await showtime_tool.ainvoke({"movie_title": "interstellar"})
 ```
 
-Most remote MCP servers require authentication. MCPAdapter delegates auth to FastMCP, so any credential a fastmcp.Client accepts works: a static bearer token, a full OAuth 2.1 flow, or any httpx.Auth.
+when we make direct tool call the above way, it returns the mcp tool response as is directly. It does not give you ToolMessage.
 
-Bearer/OAuth token
+
+| Code | What it does | Async? |
+|---|---|---|
+| `MCPAdapter(...)` | Creates adapter | No |
+| `await adapter.list_tools()` | Talks to MCP server | Yes |
+| `await tool.ainvoke(...)` | Calls MCP tool | Yes |
+
+The adapter object can be constructed synchronously, but its operations that communicate with the MCP server are async in this API.
+
+
+we can make tool call invocation in multiple ways
+
 ```
-from fastmcp import Client
-client = Client(
-    "https://my-server.com/mcp",
-    auth=BEARER_TOKEN
-)
-
-async with MCPAdapter(client) as adapter:
-
-
-auth = OAuth(
-    scopes=["user"]
-)
-
-mcp_client = Client(
-    "https://my-server.com/mcp",
-    auth=oauth
-)
-
-async with MCPAdapter(mcp_client) as adapter:
+| Method | Example | When to use |
+|---|---|---|
+| **Dictionary** | `await tool.ainvoke({"movie_title": "Interstellar"})` | ✅ Most common; tool has named arguments |
+| **Dictionary — multiple args** | `await tool.ainvoke({"movie_title": "Interstellar", "date": "2026-10-03"})` | Tool has multiple parameters |
+| **String** | `await tool.ainvoke("Interstellar")` | Tool accepts a single string input |
+| **Tool-call dictionary** | `await tool.ainvoke({"name": "check_showtimes", "args": {"movie_title": "Interstellar"}, "id": "call_123", "type": "tool_call"})` | When you already have a LangChain tool-call structure |
+| **`ToolCall` object** | Pass a `ToolCall` containing `name`, `args`, `id`, and `type` | When working directly with LangChain tool-call messages |
 ```
+
+
+**calling the tool using agent**
+
+
+When invoking the tool using the agent, tool returns a response that the langchain adapter converts it into ToolMessage that langchain agent can understand. The agent then takes the ToolMessage and generates the AIMessage - similar to how any tool call happens with agent. MCP Adapter here is used for only connecting to the server and fetch the tool details. Rest of the tool call happens 
+```
+    try:
+        cinebot_agent = create_agent(model='openai:gpt-5-mini',tools=tools)
+        result = await cinebot_agent.ainvoke({"messages":[('user', "What are the showtimes for Interstellar?")]})
+        tool_call_result = result
+        print("Agent invocation result:")
+        from rich import print
+        print(result)
+    except Exception as e:
+        print("Error during agent invocation:", e)
+```
+In both ways agent or the tool itself uses the same MCP adapter we constructred to make the initial call to MCP that gave us the list tools. It may appear that we did not pass this adapter to agent or to direct tool invocation option. 
+
+The returned LangChain tool retains the MCP client associated with the adapter, and that client is used to make the MCP call.
+
+```
+MCP tool definition
+       +
+MCP client
+       ↓
+LangChain Tool
+       │
+       ├── name
+       ├── description
+       ├── args_schema
+       ├── metadata
+       └── execution function ───────► MCP client
+```
+Agent only needs the langchain tool.
+
+The agent doesn't need to know anything about MCPAdapter.
+One particularly important detail from the 1.4.2 reference: the returned tool can call the MCP tool through its client on each invocation, and FastMCP clients are reentrant, so the tool can open/use the client even if you aren't currently holding an adapter connection.
+
+**Multimodal response from MCP**
+
+An MCP tool result isn't limited to text. langchain.mcp converts whatever the server sends — text, images, embedded files — into standard LangChain content blocks, so a model sees a uniform shape regardless of what kind of server produced it.
+
+| MCP content type | Converts to |
+|---|---|
+| `TextContent` | text content block |
+| `ImageContent` | image content block (base64 + mime type) |
+| `ResourceLink` (image mime type) | image content block (by URL) |
+| `ResourceLink` (other) | file content block |
+| `EmbeddedResource` (text) | text content block |
+| `EmbeddedResource` (blob) | image or file content block, by mime type |
+| `AudioContent` | **not yet supported** — raises `NotImplementedError` |
+
+
 
 **Structured output content** \
+
+when making tool call using the tool directly using ainvoke, it by default gives the raw tool call response from mcp.
+Every successful MCP tool call produces an MCP result. When the MCP result is handled by MCPAdapter as a LangChain tool call, it produces a ToolMessage; when the MCP tool result contains structured data, ToolMessage generated by the adapter will have a structured output section.
+
+if we want to have a ToolMessage format response to be recieved we need to use tool call style arguments
+
+```
+async with MCPAdapter(cinebot_mcp_transport) as mcp_adapter:
+    tools = await mcp_adapter.list_tools()
+    seat_map_tool = next(t for t in tools if t.name == "get_seat_map")
+
+    tool_call ={
+        'name': 'get_seat_map',
+        'args': {'movie_title': 'Interstellar'},
+        'id': 'unique_call_id_12345',  # Optional: Provide a unique ID for the call
+        'type':'tool_call'
+    }
+    # message = await seat_map_tool.ainvoke({'movie_title': 'Interstellar'}) > gives raw tool call output
+    message = await seat_map_tool.ainvoke(tool_call)
+    print("Text Content (what my model reads)",message.content)
+    print("Structured Data (what my code can use if required)",message.artifact)
+    print(message.artifact['structured_content']['available_rows'])  # Accessing structured data directly
+```
+
+```
+| Call | Input | Result |
+|---|---|---|
+| `ainvoke({"movie_title": ...})` | Tool arguments | Raw tool result in your current setup |
+| `ainvoke(tool_call)` | LangChain tool-call object | `ToolMessage` with `content` + `artifact` |
+```
+
+
+**By doing this the above way, we can the output of mcp tool and then extract only the relevant information we need and pass that specific information alone to agent for processing with the help of middlware to intercept the message and extract it. This will help to reduce the context window.**
+
+
+
 If the tool has structured output content use 
 ```structured = message.artifact["structured_content"]``` to get the structured output.
 ```
@@ -1024,6 +1124,311 @@ for res in result["messages"]:
 
 ```
 This prints out ```{'structured_content': {'name': 'aj123', 'seats': 1, 'id': 'R 83'}}```
+
+see a sample tool message which has structured output
+
+```
+ToolMessage(
+            content=[
+                {
+                    'type': 'text',
+                    'text': '{"name":"aj123","seats":1,"id":"R 33"}',
+                    'id': 'lc_0efa3407-97fb-494d-b7be-85299fb77eb7'
+                }
+            ],
+            name='reserve_seats',
+            id='0d6773e1-81b0-484e-8994-725a48c66f2e',
+            tool_call_id='call_lA9bBiLzoCpaLK1wmoe2WVYY',
+            artifact={'structured_content': {'name': 'aj123', 'seats': 1, 'id': 'R 33'}}
+        ),
+```
+if we attach a response_format to our agent, the tool message will be interpreted by agent and it generates AIMessage with a structured response. 
+```
+'structured_response': Reservation(name='aj123', seats=1, id='R 33')
+```
+
+**Error Handling**
+
+There are two kinds of error that happen with MCP tool call. In the first one the call to mcp server itself may fail, in the second case
+mcp server may encounter exception and respond back with error. 
+
+```
+| Failure | What happened | What the agent sees |
+|---|---|---|
+| Server tool **ran and reported failure** (`isError=True`) | The tool executed, then explicitly failed (bad input, business-rule violation) | A `ToolMessage` with `status="error"` — **the agent can read it and self-correct**, same as any other tool error in this course |
+| **Transport / session failure** | The connection dropped, the server crashed, the process couldn't start | **Raises an exception** — there is no error `ToolMessage` for the model to reason about, because nothing came back to convert |
+```
+
+Once the tool is passed to the agent, langchain mcp adapter will generate ToolMessage for the error message from server. 
+The tool message will then be interpreted by agent to provide better response. 
+
+
+sample tool message format generated by the adapter.
+
+```
+ToolMessage(
+    content=[
+        {
+            'type': 'text',
+            'text': "Error calling tool 'risky_lookup': Invalid booking ID format: '12345'. Expected it to start 
+with 'BK'.",
+            'id': 'lc_1a38a144-c52d-4dc6-9f68-10be74247cd7'
+        }
+    ],
+    name='risky_lookup',
+    tool_call_id='bad_call_001',
+    status='error'
+)
+```
+
+**HITL middleware for MCP tool call**
+
+Metadata in a MCP tool can provide additional information about the tool. 
+Based on this metadata information we can add middleware to the agent to make decision.
+
+Example would be ask middleware to interrupt for confirmation when it see destructiveHint=True in the tool metadata.
+
+For example for below tool 
+```
+@mcp.tool(annotations=ToolAnnotations(destructiveHint=True))
+def cancel_booking(booking_id: str) -> str:
+    """Cancel an existing booking. Irreversible."""
+    return f"Booking {booking_id} cancelled."
+
+```
+
+
+we can access it as 
+```
+for tool in tools: 
+  meta = (tool.metadata or {}).get('mcp',{}).get('tool',{}).get('annotations',{})
+  has_destructive_hint =  bool(meta.get('destructive_hint'))
+  print(f" tool: {tool.name}, has_destructive_hint: {has_destructive_hint}")
+```
+
+The tool object returned in list_tools has below info for this tool for the cancel booking which has additional metadata
+
+```
+StructuredTool(
+    name='cancel_booking',
+    description='Cancel an existing booking. Irreversible.',
+    args_schema={
+        'type': 'object',
+        'additionalProperties': False,
+        'properties': {'booking_id': {'type': 'string'}},
+        'required': ['booking_id']
+    },
+    metadata={
+        'mcp': {
+            'tool': {'annotations': {'destructive_hint': True}, '_meta': {'fastmcp': {'tags': []}}},
+            'server': {'name': 'CineBot', 'version': '4.0.10'}
+        }
+    },
+    handle_tool_error=<function _handle_mcp_tool_error at 0x11aa50ae0>,
+    response_format='content_and_artifact',
+    coroutine=<function as_langchain_tool.<locals>.call_tool at 0x12d35c040>
+)
+ tool: check_showtimes, has_destructive_hint: False
+ tool: cancel_booking, has_destructive_hint: True
+ tool: get_seat_map, has_destructive_hint: False
+```
+
+Another usecase is add requireAuthentication=True annotation to force 
+**several servers with one connection**
+
+Several servers with one connection can be done using MCPConfig dictionary.
+```
+CONFIG = {
+    "mcpServers": {
+        "weather": {"command": "python", "args": ["/path/to/weather_server.py"]},
+        "calc": {"command": "python", "args": ["/path/to/calc_server.py"]},
+    }
+}
+
+
+async def fleet_agent(config):
+    async with MCPAdapter(config) as adapter:
+```
+
+
+**elicitation with langchain mcp**
+
+In the new version server uses Elicit option to request cofnirmation from the client. client will see an interrupt from server and provides the interrupt response to complete elicitation. 
+Context.Elicit is the old way of elicitation and not supported in the new MCP servers. 
+
+```
+class CancelConfirmation(BaseModel):
+    confirm: bool = Field(description="Confirm that you want to cancel this booking.")
+
+
+async def ask_cancel_confirmation(booking_id: str) -> Elicit[CancelConfirmation]:
+    print("inside ask_cancel_confirmation")
+    return Elicit(f"Are you sure you want to cancel booking {booking_id}?", CancelConfirmation)
+
+
+@mcp.tool()
+async def cancel_booking(booking_id: str, confirmation: Annotated[CancelConfirmation, Resolve(ask_cancel_confirmation)]) -> str:
+    if not confirmation.confirm:
+        return f"Booking {booking_id} was not cancelled."
+    return f"Booking {booking_id} has been cancelled."
+```
+
+
+**several servers each with different connection**
+
+Real deployments rarely talk to just one MCP server. Two patterns, with a real tradeoff:
+```
+| Pattern | What it does | Tool naming | Protocol negotiation |
+|---|---|---|---|
+| **`MCPConfig` dict** | One aggregate connection across several servers | Prefixed by the config key you choose | **Shared** — the whole fleet negotiates down to the oldest protocol era any member requires |
+| **`ClientGroup`** | Independent connections, one per server | Namespaced `{server}_{tool}` automatically | **Independent** — each member keeps its own protocol era and auth |
+```
+
+```mermaid
+graph TB
+    subgraph MCPConfig["MCPConfig -- one aggregate connection"]
+        A1[Agent] --> C1[MCPAdapter]
+        C1 --> S1[Server A]
+        C1 --> S2[Server B]
+        S1 -.shared era.-> S2
+    end
+    subgraph ClientGroup["ClientGroup -- independent connections"]
+        A2[Agent] --> C2[MCPAdapter]
+        C2 --> G[ClientGroup]
+        G --> S3[Server A own era/auth]
+        G --> S4[Server B own era/auth]
+    end
+```
+
+If we want different auth for different servers, then use ClientGroup
+
+```
+from fastmcp.client import Client
+from fastmcp.client.group import ClientGroup
+from langchain.agents import create_agent
+from langchain.mcp import MCPAdapter
+
+
+async def agent_from_group(legacy_url: str, modern_url: str):
+    # One connection per server: a `ClientGroup` keeps each server on its own
+    # negotiated protocol era, so a legacy and a modern server run side by side.
+    # It also namespaces every tool as `{server}_{tool}`, so two servers exposing
+    # the same tool name stay distinct.
+    group = ClientGroup(
+        {
+            "weather": Client(legacy_url, mode="legacy"),
+            "calc": Client(modern_url, mode="auto"),
+        }
+    )
+    async with MCPAdapter(group) as adapter:
+```
+
+
+**Authentication in MCP servers**
+
+
+Most remote MCP servers require authentication. MCPAdapter delegates auth to FastMCP, so any credential a fastmcp.Client accepts works: a static bearer token, a full OAuth 2.1 flow, or any httpx.Auth.
+CP servers that aren't your own local script usually need auth. This is configured on the
+**FastMCP client**, not on `MCPAdapter` itself — `MCPAdapter` just wraps whatever client you hand
+it (or builds a default one for a bare URL).
+
+| Need | Pattern |
+|---|---|
+| Bearer token | `Client(url, auth=token)` |
+| OAuth 2.1 (discovery, browser redirect, token exchange) | `Client(url, auth="oauth")` |
+| Persisted OAuth across runs | `Client(url, auth=OAuth(mcp_url=url, token_storage=...))` |
+| Different auth per server | `ClientGroup` with a different `auth=` on each member `Client` |
+| Per-user auth in a deployment | A custom auth handler resolves the caller server-side; the graph factory mints/exchanges a token per user |
+
+**Server level authentication with bearer token**
+
+On MCP server side you can set up bearer token like below
+```
+
+from fastmcp.server.auth import TokenVerifier
+from fastmcp.server.auth.providers import AccessToken
+from mcp.types import ToolAnnotations
+
+
+class CineBotTokenVerifier(TokenVerifier):
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        if token != "cinebot-secret-123":
+            return None
+
+        return AccessToken(
+            token=token,
+            client_id="cinebot-client",
+            scopes=[],
+        )
+
+
+auth = CineBotTokenVerifier()
+
+mcp = FastMCP(
+    "CineBot",
+    auth=auth,
+)
+```
+
+Client side can be like below 
+```
+async def load_tools_with_bearer(url: str, token: str):
+    # `auth` accepts a bearer-token string, the literal "oauth", or any httpx.Auth.
+    async with MCPAdapter(Client(url, auth=token)) as adapter:
+        return await adapter.list_tools()
+
+# Must match AUTH_TOKEN in cinebot_mcp_server.py
+CINEBOT_AUTH_TOKEN = "cinebot-secret-123"
+
+# cinebot_mcp_server.py now serves over HTTP (port 8000) since the bearer
+# token check only applies at a network boundary. Start it first with:
+#   python cinebot_mcp_server.py
+
+print('connect with valid auth token')
+cinebot_tools = await load_tools_with_bearer("http://127.0.0.1:8000/mcp", CINEBOT_AUTH_TOKEN)
+print("Tools over HTTP with bearer auth:", [t.name for t in cinebot_tools])
+```
+
+
+**user level authentication per user**
+
+LangChain MCP supports per-user authentication by allowing the MCP client to connect to an MCP server using user-specific credentials, such as a Bearer/OAuth token. The MCP client includes that token when establishing the connection, and the MCP server validates it before allowing the user to access its tools. This means different users can connect to the same MCP server while the server identifies and authorizes each user independently. LangChain acts as the MCP client/tool consumer, while the MCP server remains responsible for authenticating and authorizing the user.
+
+For a basic token-based MCP setup, imagine the user logs into an application and receives a token such as abc123. The LangChain MCP client gets that token from the application/user session and sends it to the MCP server as Authorization: Bearer abc123. The MCP server then checks that token against its own configured list/database of valid tokens (or an authentication service) and identifies which user the token belongs to. If the token is valid, the server allows the MCP tools to be called; otherwise, it returns an authentication error.
+
+# 12. `langchain.mcp` vs. `langchain-mcp-adapters` — What Actually Changed
+
+If you (or a client) already has an MCP integration built on the older, separate
+`langchain-mcp-adapters` package, here's the honest diff — including what the new API **doesn't**
+do yet.
+
+| | `langchain-mcp-adapters` (older, separate package) | `langchain.mcp` (this notebook, beta, built-in) |
+|---|---|---|
+| Install | `pip install langchain-mcp-adapters` | `pip install "langchain[mcp]>=1.4.0"` — no separate package |
+| Entry point | `MultiServerMCPClient({...}).get_tools()` | `async with MCPAdapter(target) as adapter: await adapter.list_tools()` |
+| Resources (`get_resources`) | ✅ Supported | ❌ **Not exposed by `MCPAdapter`** — drop to the underlying `fastmcp.Client` directly if you need this |
+| Prompts (`get_prompt`) | ✅ Supported | ❌ **Not exposed by `MCPAdapter`** — same workaround |
+| Tool call interceptors (`tool_interceptors`, logging/retry/`Command`-update patterns) | ✅ Supported, via `MCPToolCallRequest` | ❌ **No interceptor hook in this beta** — customize by wrapping tools yourself after `list_tools()` |
+| Progress callbacks | ✅ Supported | Not part of the public `MCPAdapter` surface reviewed here |
+| Structured content | Via `ToolMessage` content | `ToolMessage.artifact["structured_content"]` (typed as `MCPToolArtifact`) |
+| Error handling | `handle_tool_errors` boolean flag | `isError=True` → `status="error"` automatically; transport errors raise either way |
+| Tool metadata | Ungrouped | Single `tool.metadata["mcp"]` namespace (`tool.annotations`, `_meta`, `server`) |
+| Elicitation | Not built in | Automatic, via LangGraph `interrupt()` |
+| Status | Mature, stable | **Beta** — "actively being worked on, so the API may change" (the module's own words) |
+
+> 🎤 **Teaching Note (for you):** the honest takeaway for a client engagement — if you need
+> resources, prompts, or interceptor-style middleware around MCP calls TODAY, `langchain-mcp-adapters`
+> still does things `langchain.mcp` doesn't yet. If you're starting fresh and only need tools, the
+> new built-in path is where LangChain is clearly headed, and it's what today's official docs lead
+> with. Don't present this as a strict "old bad, new good" — it's "different surface area, and the
+> new one isn't a full superset yet."
+
+**Live Demo for multi server mcp connection**
+
+<a href="./MCP in Langchain/MCP_MultiServer_Live_Demo.ipynb">Demo of multi server connection ></a>
+
+In this we connect to our vercel deployed time track mcp server, context 7 mcp server, and our cinebot server using langchain mcp client.
 
 ### Additional references
 

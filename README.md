@@ -17,11 +17,14 @@ Folder: `krishnaik-agentic-ai-3-0/`
 | `krishnaik-3-0-mcp-notes.md` | Course notes on MCP (host/client/server architecture, server types, MCP JAM, streamable HTTP) |
 | `krishnaik-3-0-multi-agent-notes.md` | Short notes on multi-agent patterns (subagent, parallel, controller/router, reactive, hierarchical, planner-executor) |
 | `krishnaik-3-0-1-assignment-langchain.md` | Assignment 1, Part A: written Q&A covering agents/harness, messages, structured output, and tools |
-| `krishnaik-3-0-1-assignment-langchain-part-b.ipynb` | Assignment 1, Part B: my coding-exercise solutions (a `@tool`, a `ChatPromptTemplate`, a constrained-field Pydantic `FoodOrder` schema, and the Medium exercises) |
-| `krishnaik-3-0-langchain-tools.ipynb` | Defining and using LangChain tools with `init_chat_model` |
-| `krishnaik-3-0-langchain-structured-schema.ipynb` | Structured output with `ToolStrategy`, `ProviderStrategy`, and agent `response_format` |
-| `krishnaik-3-0-langchain-agentstate-runtime.ipynb` | Agent state, context/tool runtime, dynamic prompting, human-in-the-loop with `interrupt`/`Command` |
-| `krishnaik-3-0-langchain-middleware.ipynb` | Prebuilt middleware (summarization, HITL, model/tool-call limits, PII, retry, tool selector, shell) and custom middleware |
+| `notebooks/krishnaik-3-0-1-assignment-langchain-part-b.ipynb` | Assignment 1, Part B: my coding-exercise solutions (a `@tool`, a `ChatPromptTemplate`, a constrained-field Pydantic `FoodOrder` schema, and the Medium exercises) |
+| `notebooks/krishnaik-3-0-langchain-tools.ipynb` | Defining and using LangChain tools with `init_chat_model` |
+| `notebooks/krishnaik-3-0-langchain-structured-schema.ipynb` | Structured output with `ToolStrategy`, `ProviderStrategy`, and agent `response_format` |
+| `notebooks/krishnaik-3-0-langchain-agentstate-runtime.ipynb` | Agent state, context/tool runtime, dynamic prompting, human-in-the-loop with `interrupt`/`Command` |
+| `notebooks/krishnaik-3-0-langchain-middleware.ipynb` | Prebuilt middleware (summarization, HITL, model/tool-call limits, PII, retry, tool selector, shell) and custom middleware |
+| `notebooks/langchain-mcp.ipynb` | LangChain MCP adapter notes (`langchain-mcp-adapters`, installed with `uv add`) |
+| `MCP in Langchain/MCP_in_Langchain.ipynb` | MCP in LangChain: calling tools without an agent, multimodal tool output, structured output, error handling, multiple servers, authentication |
+| `MCP in Langchain/MCP_MultiServer_Live_Demo.ipynb` | Live multi-server MCP demo, run from VS Code with `uv` |
 | `krishnaik-3-0-mcp-projects/` | Runnable MCP examples: `mcp-warmup`, `my-first-mcp` (recipe box), and `TimeTrackProject` (time-tracking MCP server + web app) |
 | `mcp-client-and-advanced/` | Self-contained MCP *client*-side project: a full TimeTrack server plus 9 numbered client scripts covering raw `stdio_client`, FastMCP clients, an agent loop, sampling, elicitation, ping/errors, timeouts/cancellation, and progress notifications |
 | `images/` | Diagrams and screenshots referenced from the notes files |
